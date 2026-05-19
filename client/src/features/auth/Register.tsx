@@ -117,7 +117,7 @@ export default function Register() {
             <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-transparent"></div>
             <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-4">
               <h1 className="text-xl font-bold mb-2">Join Our Team</h1>
-              <p className="text-blue-100 text-sm">Create your account</p>
+              <p className="text-blue-100 text-sm">Audio SOP Management System</p>
             </div>
           </div>
         </div>
@@ -132,10 +132,10 @@ export default function Register() {
             />
           </div>
           <h2 className="text-2xl font-bold text-white animate-slideUp" style={{animationDelay: '0.5s'}}>
-            Cost Rate Approval
+            Audio SOP System
           </h2>
           <p className="mt-1 text-sm text-gray-200 animate-slideUp" style={{animationDelay: '0.7s'}}>
-            Enterprise Financial Management System
+            Manufacturing Operations Management
           </p>
         </div>
 
