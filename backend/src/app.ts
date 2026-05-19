@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import corsMiddleware from './middleware/cors.middleware';
 // import { apiLimiter } from './middleware/rateLimit.middleware';
 import path from 'path';
+import { UPLOADS_ROOT } from './config/paths.config';
 
 dotenv.config();
 
@@ -13,14 +14,34 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(corsMiddleware);
 // app.use(apiLimiter);
 
 app.set("trust proxy", 1);
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+const uploadsPath = UPLOADS_ROOT;
+
+// Serve static uploads with headers so the SPA (different port) can play audio
+app.use(
+  "/uploads",
+  (_req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    next();
+  },
+  express.static(uploadsPath, {
+    fallthrough: true,
+    setHeaders(res) {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    },
+  })
+);
 
 //  Router configuration   
 app.use('/api', router);

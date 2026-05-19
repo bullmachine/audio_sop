@@ -44,8 +44,44 @@ export const createUserSchema = () => yup.object().shape({
   password: yup.string().min(6, "Password must be at least 6 characters").required("Password is required"),
 });
 
+export const createOperatorSchema = (isEdit = false) =>
+  yup.object({
+    name: yup.string().required("Name is required").trim(),
+    loginId: yup.string().required("Login ID is required").trim(),
+    password: isEdit
+      ? yup.string().min(6, "Password must be at least 6 characters").optional()
+      : yup.string().min(6, "Password must be at least 6 characters").required("Password is required"),
+  }) as yup.ObjectSchema<{
+    name: string;
+    loginId: string;
+    password?: string;
+  }>;
+
+export const createProductSchema = () =>
+  yup.object({
+    name: yup
+      .string()
+      .required("Product name is required")
+      .min(2, "Product name must be at least 2 characters")
+      .max(100, "Product name cannot exceed 100 characters")
+      .trim(),
+    description: yup.string().optional().trim(),
+  }) as yup.ObjectSchema<{
+    name: string;
+    description?: string;
+  }>;
+
+export const createAudioSopSchema = () =>
+  yup.object({
+    product: yup.string().required("Product is required"),
+    stage: yup.string().required("Stage is required"),
+    language: yup.string().required("Language is required"),
+    sopName: yup.string().required("SOP name is required").trim(),
+    operators: yup.array().of(yup.string().required()).min(1, "Select at least one operator"),
+  });
+
 export const createLoginSchema = () => yup.object().shape({
-  email: yup.string().email("Invalid email format").required("Email is required"),
+  loginId: yup.string().required("Login ID is required"),
   password: yup.string().required("Password is required"),
 });
 

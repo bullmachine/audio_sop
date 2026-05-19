@@ -9,6 +9,9 @@ import {
   UserOutlined,
   KeyOutlined,
   SafetyOutlined,
+  AudioOutlined,
+  SoundOutlined,
+  AppstoreOutlined,
 //   CrownOutlined,
 //   CloudSyncOutlined
 } from "@ant-design/icons";
@@ -27,8 +30,11 @@ export const ROUTES = {
     ROLE_USER: "/role_user",
     PERMISSION: "/permission",
     USER_PERMISSIONS: "/user-permissions",
-     
-     };
+    MY_AUDIO: "/my-audio",
+    PRODUCT: "/product",
+    OPERATOR: "/operator",
+    AUDIO_FILES: "/audio-files",
+};
 
 export type MenuItem = {
     name: string;
@@ -46,6 +52,12 @@ export const MenuItems: MenuItem[] = [
         requiredPermissions: []
     },
     {
+        name: "My Audio",
+        path: ROUTES.MY_AUDIO,
+        icon: <AudioOutlined />,
+        requiredPermissions: [ ]
+    },    
+    {
         name: "Process Master",
         icon: <ToolOutlined />,
         subItems: [
@@ -60,8 +72,27 @@ export const MenuItems: MenuItem[] = [
                 path: ROUTES.LANGUAGE,
                 icon: <FileTextOutlined />,
                 requiredPermissions: [ ]
-            },           
-                    ]
+            },     
+            {
+                name: "Operators",
+                path: ROUTES.OPERATOR,
+                icon: <UserOutlined />,
+                requiredPermissions: [ ],
+            },
+            {
+                name: "KMAT Products",
+                path: ROUTES.PRODUCT,
+                icon: <AppstoreOutlined />,
+                requiredPermissions: [ ],
+            },          
+            {
+                name: "Audio Files",
+                path: ROUTES.AUDIO_FILES,
+                icon: <SoundOutlined />,
+                requiredPermissions: [],
+            },
+       
+         ]
     },
     {
         name: "Access Control",

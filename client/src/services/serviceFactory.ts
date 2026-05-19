@@ -1,4 +1,5 @@
 import { GenericCrudService } from './genericCrud';
+import audioSopService from './audioSopService';
 
 // Service factory for centralized service management
 class ServiceFactory {
@@ -21,6 +22,19 @@ class ServiceFactory {
   static get languageService() {
     return this.getService<any>('/language');
   }
+
+  static get productService() {
+    return this.getService<any>('/product');
+  }
+
+  static get operatorService() {
+    return this.getService<any>('/operator');
+  }
+
+  static get audioSopService() {
+    return audioSopService;
+  }
+
   static get roleService() {
     return this.getService<any>('/role');
   }

@@ -5,8 +5,11 @@ import { userRoutes } from "./user.routes";
 import { roleUserRoutes } from "./roleUser.routes";
 import { permissionRoutes } from "./permission.routes";
 import { userPermissionRoutes } from "./userPermission.routes";
-import { languageRoutes } from "./language.routes"; 
-import stageRoutes from "./stage.routes"; 
+import { languageRoutes } from "./language.routes";
+import stageRoutes from "./stage.routes";
+import { productRoutes } from "./product.routes";
+import { operatorRoutes } from "./operator.routes";
+import { audioSopRoutes } from "./audioSop.routes";
 
 const router = express.Router();
 
@@ -16,6 +19,9 @@ router.use('/auth', commonRouter);
 // Project Route
 router.use('/stage', stageRoutes);
 router.use('/language', languageRoutes);
+router.use('/product', productRoutes);
+router.use('/operator', operatorRoutes);
+router.use('/audio-sop', audioSopRoutes);
 
 // New RESTful routes for GenericCrudService
 router.use('/role', roleRoutes);

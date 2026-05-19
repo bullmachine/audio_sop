@@ -21,6 +21,10 @@ import UserPermissionAssignment from "../../features/admin/access_control/UserPe
 import Profile from "../../features/admin/Profile"; 
 import Stage from "../../features/admin/master/Stage";
 import Language from "../../features/admin/master/Language";
+import OperatorPage from "../../features/admin/master/Operator";
+import AudioFile from "../../features/admin/master/AudioFile";
+import Product from "../../features/admin/master/Product";
+import OperatorDashboard from "../../features/operator/OperatorDashboard";
 
 const AppRoutes = () => {
   const dispatch = useAppDispatch();
@@ -56,6 +60,26 @@ const AppRoutes = () => {
     { 
       path: ROUTES.LANGUAGE, 
       element: <Language />,
+      requiredPermissions: [ ]
+    },
+    { 
+      path: ROUTES.OPERATOR, 
+      element: <OperatorPage />,
+      requiredPermissions: [ ]
+    },
+    { 
+      path: ROUTES.AUDIO_FILES, 
+      element: <AudioFile />,
+      requiredPermissions: [ ]
+    },
+    { 
+      path: ROUTES.MY_AUDIO, 
+      element: <OperatorDashboard />,
+      requiredPermissions: [ ]
+    },
+    { 
+      path: ROUTES.PRODUCT, 
+      element: <Product />,
       requiredPermissions: [ ]
     },
     { 

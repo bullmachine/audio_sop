@@ -1,5 +1,5 @@
 
-export const STORAGE_PREFIX = 'rate_approval_';
+export const STORAGE_PREFIX = 'audio_sop_';
 
 // Centralized storage keys
 export const STORAGE_KEYS = {
@@ -9,7 +9,7 @@ export const STORAGE_KEYS = {
   FORMDATA: `${STORAGE_PREFIX}form_data`,
 
   // Fallback for development
-  BASE_URL: 'http://192.168.1.33/rate-approval/',
+  BASE_URL: 'http://192.168.1.33/audio_sop/',
   API_BASE_URL: 'http://localhost:8000/api',
   ASSET_URL: 'http://localhost:8000',
 } as const;

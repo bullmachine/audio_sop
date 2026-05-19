@@ -6,41 +6,46 @@ const RoleUserSeeder = async () => {
     try {
         await RoleUser.deleteMany({});
 
-        // Find Super Admin role and Super Admin user
         const superAdminRole = await Role.findOne({ role: "Super Admin" });
-        const superAdminUser = await User.findOne({ email: "php@bullmachine.com" });
-        const regularUser = await User.findOne({ email: "user@bullmachine.com" });
-
-        if (!superAdminRole) {
-            console.error('Super Admin role not found. Please run role seeder first.');
-            return;
-        }
-
-        if (!superAdminUser) {
-            console.error('Super Admin user not found. Please run user seeder first.');
-            return;
-        }
+        const operatorRole = await Role.findOne({ role: "Operator" });
+        const superAdminUser = await User.findOne({ empCode: "ADMIN001" });
+        const operatorUsers = await User.find({ empCode: { $in: ["OP001", "OP002"] } });
 
         const roleUsers = [
-            {
-                role: superAdminRole._id,
-                users: [superAdminUser._id],
-                active: true
-            },
-            // Assign regular user to User role
-            ...(regularUser ? [{
-                role: (await Role.findOne({ role: "User" }))?._id,
-                users: [regularUser._id],
-                active: true
-            }] : [])
-        ].filter(ru => ru.role && ru.users); // Filter out any entries where role or users are null
+            superAdminRole && superAdminUser
+                ? {
+                      role: superAdminRole._id,
+                      users: [superAdminUser._id],
+                      active: true,
+                  }
+                : null,
+            operatorRole && operatorUsers.length
+                ? {
+                      role: operatorRole._id,
+                      users: operatorUsers.map((u) => u._id),
+                      active: true,
+                  }
+                : null,
+        ].filter(Boolean);
 
-        // Insert role-user assignments into the database
-        await RoleUser.insertMany(roleUsers);
+        if (roleUsers.length) {
+            await RoleUser.insertMany(roleUsers);
+        }
 
-        console.log('Role-User assignments seeded successfully!');
+        // Assign roles directly on user documents
+        if (superAdminRole && superAdminUser) {
+            await User.findByIdAndUpdate(superAdminUser._id, { role: superAdminRole._id });
+        }
+        if (operatorRole && operatorUsers.length) {
+            await User.updateMany(
+                { _id: { $in: operatorUsers.map((u) => u._id) } },
+                { role: operatorRole._id }
+            );
+        }
+
+        console.log("Role-User assignments seeded successfully!");
     } catch (err) {
-        console.error('Error seeding role-user assignments:', err);
+        console.error("Error seeding role-user assignments:", err);
     }
 };
 
