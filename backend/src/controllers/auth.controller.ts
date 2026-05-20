@@ -5,6 +5,8 @@ import mongoose from 'mongoose';
 import User from '../models/User';
 import UserPermission from '../models/UserPermission';
 import Permission from '../models/Permission';
+import Tracking from '../models/AudioTracking';
+import Employee from '../models/Employee';
 import { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken } from '../utils/token';
 
 let refreshTokens: string[] = []; // In prod, store in DB or Redis
@@ -54,20 +56,55 @@ export const register = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { empCode, password } = req.body;
+    const { operator_id, password, employee_code, dob } = req.body;
+    // Validate operator_id against User collection
+    const operator = await User.findOne({ empCode: operator_id, isDeleted: false });
 
-    // Explicitly select password and populate role
-    const user = await User.findOne({ empCode, isDeleted: false }).select(
+    if (!operator) {
+      return res.status(400).json({ message: "Invalid Operator ID" });
+    }
+
+    // Validate employee_code and DOB against Employee collection
+    const employee = await Employee.findOne({ emp_code: employee_code });
+
+    if (!employee) {
+      return res.status(400).json({ message: "Invalid Employee Code or DOB" });
+    }
+
+    // Check if DOB matches
+    if (!employee.date_of_birth) {
+      return res.status(400).json({ message: "Invalid Employee Code or DOB" });
+    }
+
+    // Parse DOB from request and compare with employee date_of_birth
+    const requestDob = new Date(dob);
+    const employeeDob = new Date(employee.date_of_birth);
+
+    // Compare dates (ignoring time)
+    const requestDobStr = requestDob.toISOString().split('T')[0];
+    const employeeDobStr = employeeDob.toISOString().split('T')[0];
+
+    if (requestDobStr !== employeeDobStr) {
+      return res.status(400).json({ message: "Invalid Employee Code or DOB" });
+    }
+
+    // Check if employee status is active
+    if (employee.employee_status && employee.employee_status.toLowerCase() !== 'active') {
+      return res.status(400).json({ message: "Employee account is inactive" });
+    }
+
+    // Employee validation passed, now authenticate against User collection using employee_code
+    const user = await User.findOne({ empCode: operator_id, isDeleted: false }).select(
       "+password"
     ).populate('role');
-    
+
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({ message: "User account not found. Please contact administrator." });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({ message: "Invalid password" });
     }
 
     const token = generateAccessToken({ id: user._id });
@@ -81,6 +118,40 @@ export const login = async (req: Request, res: Response) => {
       path: "/api/auth/refresh",
     });
 
+    // Automatically create login tracking record
+    try {
+      const ip_address = req.ip || req.connection.remoteAddress;
+      const user_agent = req.headers['user-agent'];
+
+      // Detect device type from user agent
+      let device_type = 'desktop';
+      if (user_agent) {
+        if (/mobile/i.test(user_agent)) device_type = 'mobile';
+        else if (/tablet/i.test(user_agent)) device_type = 'tablet';
+      }
+
+      const logData: any = {
+        user_id: user._id,
+        emp_code: employee.emp_code,
+        user_name: employee.full_name || employee.first_name || user.name,
+        tracking_type: 'login',
+        login_time: new Date(),
+        ip_address,
+        user_agent,
+        device_type,
+        status: 'active',
+      };
+
+      // Include operator_id from the validated operator
+      logData.operator_id = operator.empCode;
+
+      const trackingRecord = new Tracking(logData);
+      await trackingRecord.save();
+    } catch (logError) {
+      // Log error but don't fail the login
+      console.error('Error creating login tracking:', logError);
+    }
+
     res.json({
       token,
       user: {
@@ -88,7 +159,7 @@ export const login = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         mobile: user.mobile,
-        role: user.role,  
+        role: user.role,
       },
     });
   } catch (err) {

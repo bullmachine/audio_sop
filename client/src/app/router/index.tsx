@@ -25,6 +25,7 @@ import OperatorPage from "../../features/admin/master/Operator";
 import AudioFile from "../../features/admin/master/AudioFile";
 import Product from "../../features/admin/master/Product";
 import OperatorDashboard from "../../features/operator/OperatorDashboard";
+import EmployeeManagement from "../../features/admin/EmployeeManagement";
 
 const AppRoutes = () => {
   const dispatch = useAppDispatch();
@@ -105,6 +106,11 @@ const AppRoutes = () => {
     { 
       path: "/profile", 
       element: <Profile />,
+      requiredPermissions: []
+    },
+    { 
+      path: ROUTES.EMPLOYEES, 
+      element: <EmployeeManagement />,
       requiredPermissions: []
     },      
   ];

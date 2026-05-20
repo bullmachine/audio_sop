@@ -34,6 +34,7 @@ export const ROUTES = {
     PRODUCT: "/product",
     OPERATOR: "/operator",
     AUDIO_FILES: "/audio-files",
+    EMPLOYEES: "/employees",
 };
 
 export type MenuItem = {
@@ -123,5 +124,11 @@ export const MenuItems: MenuItem[] = [
                 requiredPermissions: [{ module: "User Permissions", action: "view" }]
             }
         ]
+    },
+    {
+        name: "Employees",
+        path: ROUTES.EMPLOYEES,
+        icon: <TeamOutlined />,
+        requiredPermissions: []
     }
 ];

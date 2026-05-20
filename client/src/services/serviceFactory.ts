@@ -1,5 +1,7 @@
 import { GenericCrudService } from './genericCrud';
 import audioSopService from './audioSopService';
+import employeeService from './employeeService';
+import trackingService from './trackingService';
 
 // Service factory for centralized service management
 class ServiceFactory {
@@ -76,7 +78,16 @@ class ServiceFactory {
     return this.getService<any>('/userPermission/remove');
   }
 
- 
+  // Employee service
+  static get employeeService() {
+    return employeeService;
+  }
+
+  // Tracking service
+  static get trackingService() {
+    return trackingService;
+  }
+
   // Generic service getter for custom endpoints
   static createService<T>(endpoint: string): GenericCrudService<T> {
     return new GenericCrudService<T>(endpoint);

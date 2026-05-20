@@ -10,6 +10,8 @@ import stageRoutes from "./stage.routes";
 import { productRoutes } from "./product.routes";
 import { operatorRoutes } from "./operator.routes";
 import { audioSopRoutes } from "./audioSop.routes";
+import { employeeRoutes } from "./employee.routes";
+import { trackingRoutes } from "./tracking.routes";
 
 const router = express.Router();
 
@@ -28,6 +30,8 @@ router.use('/role', roleRoutes);
 router.use('/users', userRoutes);
 router.use('/roleUser', roleUserRoutes);
 router.use('/permission', permissionRoutes);
-router.use('/userPermission', userPermissionRoutes); 
+router.use('/userPermission', userPermissionRoutes);
+router.use('/employees', employeeRoutes);
+router.use('/tracking', trackingRoutes);
 
 export { router };

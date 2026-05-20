@@ -3,15 +3,9 @@ import type { User, AuthResponse } from '../types/auth';
 import { STORAGE_KEYS, APP_BASE_URL } from './storage';
 
 const authService = {
-    async login(empCode: string, password: string): Promise<AuthResponse> {
+    async login(operator_id: string, password: string, employee_code: string, dob: string): Promise<AuthResponse> {
         try {
-            // const response = await apiRequest<AuthResponse>({
-            //     url: '/auth/login',
-            //     method: 'POST',
-            //     data: { empCode, password },
-            // });
-
-            const response = await apiRequest.post<AuthResponse>('/auth/login', { empCode, password });
+            const response = await apiRequest.post<AuthResponse>('/auth/login', { operator_id, password, employee_code, dob });
 
             if (response.token) {
                 localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);

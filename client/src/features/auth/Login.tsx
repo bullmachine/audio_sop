@@ -15,11 +15,13 @@ import { useLoader } from "../../shared/hooks/useLoader";
 import { ThemeToggleButton } from "../../layouts/ThemeToggleButton";
 
 const schema = yup.object().shape({
-  empCode: yup.string().required("Employee Code is required"),
+  operator_id: yup.string().required("Operator ID is required"),
   password: yup
     .string()
     .min(6, "Password must be at least 6 characters")
     .required("Password is required"),
+  employee_code: yup.string().required("Employee Code is required"),
+  dob: yup.string().required("Date of Birth is required"),
 });
 
 export default function Login() {
@@ -46,17 +48,17 @@ export default function Login() {
     }
   }, [errors]);
 
-  const onSubmit = async (data: { empCode: string; password: string }) => {
+  const onSubmit = async (data: { operator_id: string; password: string; employee_code: string; dob: string }) => {
     try {
       await simulateAsync(
         async () => {
-          const response = await authService.login(data.empCode, data.password);
+          const response = await authService.login(data.operator_id, data.password, data.employee_code, data.dob);
           dispatch(login(response));
           // Fetch user permissions only if not already loaded
           if (!permissionsLoaded) {
             dispatch(fetchUserPermissions());
           }
-          toast.success("Login successful!"); 
+          toast.success("Login successful!");
           reset();
           navigate("/dashboard");
         },
@@ -127,15 +129,15 @@ export default function Login() {
         <div className="backdrop-blur-xl bg-white/10 dark:bg-gray-900/10 border border-white/20 dark:border-gray-700/20 rounded-2xl shadow-2xl p-6 animate-slideUp" style={{animationDelay: '0.9s'}}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label htmlFor="empCode" className="block text-sm font-medium text-white mb-1">
-                Employee Code
+              <label htmlFor="operator_id" className="block text-sm font-medium text-white mb-1">
+                Operator ID
               </label>
               <Input
-                {...register("empCode")}
-                id="empCode"
+                {...register("operator_id")}
+                id="operator_id"
                 type="text"
                 label=""
-                placeholder="Enter your employee code"
+                placeholder="Enter operator ID"
                 className="backdrop-blur-sm bg-white/20 border-white/30 focus:border-blue-400 focus:ring-blue-400 text-white placeholder-gray-300 transition-all duration-300"
               />
             </div>
@@ -150,6 +152,34 @@ export default function Login() {
                 label=""
                 placeholder="Enter your password"
                 isPassword
+                className="backdrop-blur-sm bg-white/20 border-white/30 focus:border-blue-400 focus:ring-blue-400 text-white placeholder-gray-300 transition-all duration-300"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="employee_code" className="block text-sm font-medium text-white mb-1">
+                Employee Code
+              </label>
+              <Input
+                {...register("employee_code")}
+                id="employee_code"
+                type="text"
+                label=""
+                placeholder="Enter your employee code"
+                className="backdrop-blur-sm bg-white/20 border-white/30 focus:border-blue-400 focus:ring-blue-400 text-white placeholder-gray-300 transition-all duration-300"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="dob" className="block text-sm font-medium text-white mb-1">
+                Date of Birth
+              </label>
+              <Input
+                {...register("dob")}
+                id="dob"
+                type="date"
+                label=""
+                placeholder="Enter your date of birth"
                 className="backdrop-blur-sm bg-white/20 border-white/30 focus:border-blue-400 focus:ring-blue-400 text-white placeholder-gray-300 transition-all duration-300"
               />
             </div>
