@@ -29,6 +29,10 @@ class ServiceFactory {
     return this.getService<any>('/product');
   }
 
+  static get sopService() {
+    return this.getService<any>('/sop');
+  }
+
   static get operatorService() {
     return this.getService<any>('/operator');
   }

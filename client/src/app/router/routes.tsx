@@ -35,6 +35,7 @@ export const ROUTES = {
     OPERATOR: "/operator",
     AUDIO_FILES: "/audio-files",
     EMPLOYEES: "/employees",
+    SOP: "/sop",
 };
 
 export type MenuItem = {
@@ -90,6 +91,12 @@ export const MenuItems: MenuItem[] = [
                 name: "Audio Files",
                 path: ROUTES.AUDIO_FILES,
                 icon: <SoundOutlined />,
+                requiredPermissions: [],
+            },
+            {
+                name: "SOP",
+                path: ROUTES.SOP,
+                icon: <FileTextOutlined />,
                 requiredPermissions: [],
             },
        

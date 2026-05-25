@@ -71,6 +71,15 @@ export const createProductSchema = () =>
     description?: string;
   }>;
 
+export const createSopSchema = () =>
+  yup.object({
+    sop_name: yup.string().required("SOP name is required").min(2, "SOP name must be at least 2 characters").max(100, "SOP name cannot exceed 100 characters").trim(),
+    sop_description: yup.string().optional().max(500, "SOP description cannot exceed 500 characters").trim(),
+  }) as yup.ObjectSchema<{
+    sop_name: string;
+    sop_description?: string;
+  }>;
+
 export const createAudioSopSchema = () =>
   yup.object({
     product: yup.string().required("Product is required"),

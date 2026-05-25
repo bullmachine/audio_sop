@@ -12,6 +12,7 @@ import { operatorRoutes } from "./operator.routes";
 import { audioSopRoutes } from "./audioSop.routes";
 import { employeeRoutes } from "./employee.routes";
 import { trackingRoutes } from "./tracking.routes";
+import { sopRoutes } from "./sop.routes";
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.use('/auth', commonRouter);
 router.use('/stage', stageRoutes);
 router.use('/language', languageRoutes);
 router.use('/product', productRoutes);
+router.use('/sop', sopRoutes);
 router.use('/operator', operatorRoutes);
 router.use('/audio-sop', audioSopRoutes);
 

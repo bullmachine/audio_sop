@@ -124,7 +124,6 @@ const EmployeeSchema: Schema = new Schema(
 );
 
 // Index for faster queries
-EmployeeSchema.index({ emp_code: 1 });
 EmployeeSchema.index({ department_code: 1 });
 EmployeeSchema.index({ employee_status: 1 });
 

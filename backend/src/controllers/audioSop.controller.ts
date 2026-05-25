@@ -274,9 +274,7 @@ export const getMyAssignments = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const search = (req.query.search as string) || "";
-    const productFilter = req.query.product as string;
-    const stageFilter = req.query.stage as string;
+    const sopFilter = req.query.sop as string;
 
     const query: Record<string, unknown> = {
       isDeleted: false,
@@ -284,9 +282,7 @@ export const getMyAssignments = async (req: AuthRequest, res: Response) => {
       operators: req.user.id,
     };
 
-    if (search) query.sopName = { $regex: search, $options: "i" };
-    if (productFilter) query.product = productFilter;
-    if (stageFilter) query.stage = stageFilter;
+    if (sopFilter) query._id = sopFilter;
 
     const assignments = await AudioSop.find(query).populate(populateFields).sort({ createdAt: -1 });
 

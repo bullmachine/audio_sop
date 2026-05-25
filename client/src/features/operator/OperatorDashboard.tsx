@@ -8,13 +8,11 @@ import {
   StepForwardOutlined,
 } from "@ant-design/icons";
 import Breadcrumbs from "../../shared/component/Breadcrumbs";
-import { Input } from "../../shared/component/Input";
 import { Select } from "../../shared/component/Select";
 import NoData from "../../shared/component/NoData";
 import ServiceFactory from "../../services/serviceFactory";
 import type { AudioSop } from "../../services/audioSopService";
 import { useLoader } from "../../shared/hooks/useLoader";
-import { useDebouncedSearch } from "../../hooks/useDebounce";
 import { getAudioUrl } from "../../utils/audioUrl";
 import { toast } from "react-toastify";
 
@@ -56,9 +54,7 @@ const OperatorDashboard: React.FC = () => {
   const { simulateAsync } = useLoader();
   const [assignments, setAssignments] = useState<AudioSop[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchText, setSearchText] = useState("");
-  const [productFilter, setProductFilter] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
+    const [sopFilter, setSopFilter] = useState("");
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -134,44 +130,26 @@ useEffect(() => {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  const fetchAssignments = async (search?: string) => {
+  const fetchAssignments = async () => {
     const params: Record<string, string> = {};
-    if (search) params.search = search;
-    if (productFilter) params.product = productFilter;
-    if (stageFilter) params.stage = stageFilter;
+    if (sopFilter) params.sop = sopFilter;
 
     const response = await ServiceFactory.audioSopService.getMyAssignments(params);
     setAssignments(response.data || []);
   };
 
-  const fetchWithLoader = async (search?: string) => {
+  const fetchWithLoader = async () => {
     setLoading(true);
-    await simulateAsync(() => fetchAssignments(search), "Loading your audio files...", 800);
+    await simulateAsync(() => fetchAssignments(), "Loading your audio files...", 800);
     setLoading(false);
   };
 
-  const { updateSearchText, debouncedFetchData, cancelPendingCalls } = useDebouncedSearch(
-    setSearchText,
-    fetchAssignments,
-    400
-  );
-
-  const productOptions = useMemo(() => {
+    const sopOptions = useMemo(() => {
     const map = new Map<string, string>();
     assignments.forEach((a) => {
-      const id = typeof a.product === "string" ? a.product : a.product._id;
-      map.set(id, getLabel(a.product));
+      map.set(a._id, a.sopName);
     });
-    return [{ label: "All Products", value: "" }, ...Array.from(map, ([value, label]) => ({ value, label }))];
-  }, [assignments]);
-
-  const stageOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    assignments.forEach((a) => {
-      const id = typeof a.stage === "string" ? a.stage : a.stage._id;
-      map.set(id, getLabel(a.stage));
-    });
-    return [{ label: "All Stages", value: "" }, ...Array.from(map, ([value, label]) => ({ value, label }))];
+    return [{ label: "All SOPs", value: "" }, ...Array.from(map, ([value, label]) => ({ value, label }))];
   }, [assignments]);
 
   const stopPlayback = useCallback(() => {
@@ -293,7 +271,7 @@ useEffect(() => {
 
   useEffect(() => {
     fetchWithLoader();
-  }, [productFilter, stageFilter]);
+  }, [sopFilter]);
 
   useEffect(() => {
     const audio = new Audio(); 
@@ -354,32 +332,12 @@ audio.addEventListener("timeupdate", () => {
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           Tracks play in admin order. Use earphone controls to navigate between tracks.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Input
-            placeholder="Search SOP name..."
-            value={searchText}
-            onChange={(e) => {
-              updateSearchText(e.target.value);
-              if (e.target.value.trim() === "") {
-                cancelPendingCalls();
-                fetchWithLoader("");
-              } else {
-                debouncedFetchData(e.target.value);
-              }
-            }}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
           <Select
             label=""
-            options={productOptions}
-            value={productFilter}
-            onChange={(e) => setProductFilter(e.target.value)}
-            searchable
-          />
-          <Select
-            label=""
-            options={stageOptions}
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
+            options={sopOptions}
+            value={sopFilter}
+            onChange={(e) => setSopFilter(e.target.value)}
             searchable
           />
         </div>

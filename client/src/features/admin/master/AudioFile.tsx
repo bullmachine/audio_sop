@@ -53,6 +53,7 @@ const AudioFile: React.FC = () => {
   const [stages, setStages] = useState<{ label: string; value: string }[]>([]);
   const [languages, setLanguages] = useState<{ label: string; value: string }[]>([]);
   const [operators, setOperators] = useState<{ label: string; value: string }[]>([]);
+  const [sops, setSops] = useState<{ label: string; value: string }[]>([]);
 
   const [form, setForm] = useState({
     product: "",
@@ -69,11 +70,12 @@ const AudioFile: React.FC = () => {
     usePagination({ defaultPageSize: 10 });
 
   const fetchMasters = async () => {
-    const [productRes, stageRes, langRes, opRes] = await Promise.all([
+    const [productRes, stageRes, langRes, opRes, sopRes] = await Promise.all([
       ServiceFactory.productService.getAll({ page: 1, limit: 100 }),
       ServiceFactory.stageService.getAll({ page: 1, limit: 100 }),
       ServiceFactory.languageService.getAll({ page: 1, limit: 100 }),
       ServiceFactory.operatorService.getAll({ page: 1, limit: 100 }),
+      ServiceFactory.sopService.getAll({ page: 1, limit: 100 }),
     ]);
 
     setProducts((productRes.data || []).map((p: any) => ({ label: p.name, value: p._id })));
@@ -82,6 +84,7 @@ const AudioFile: React.FC = () => {
     setOperators(
       (opRes.data || []).map((o: any) => ({ label: `${o.name} (${o.empCode})`, value: o._id }))
     );
+    setSops((sopRes.data || []).map((s: any) => ({ label: s.sop_name, value: s._id })));
   };
 
   const fetchData = async (searchValue?: string) => {
@@ -389,11 +392,12 @@ const AudioFile: React.FC = () => {
             onChange={(values) => setForm((f) => ({ ...f, operators: values }))}
             placeholder="Select one or more operators..."
           />
-          <Input
+          <Select
             label="SOP Name"
-            placeholder="Enter SOP name"
+            options={[{ label: "Select SOP", value: "" }, ...sops]}
             value={form.sopName}
             onChange={(e) => setForm((f) => ({ ...f, sopName: e.target.value }))}
+            searchable
           />
 
           <div>

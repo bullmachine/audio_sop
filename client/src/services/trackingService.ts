@@ -115,6 +115,16 @@ class TrackingService {
   }): Promise<{ data: TrackingStats }> {
     return apiRequest.get(`${this.endpoint}/stats`, { params });
   }
+
+  // Get employee date-wise analysis
+  async getEmployeeDateWiseAnalysis(params: {
+    start_date?: string;
+    end_date?: string;
+    emp_code?: string;
+    machine_number?: string;
+  }): Promise<{ data: { dateWise: any[]; summary: any[] } }> {
+    return apiRequest.get(`${this.endpoint}/employee-date-wise-analysis`, { params });
+  }
 }
 
 export default new TrackingService();

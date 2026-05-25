@@ -26,6 +26,7 @@ import AudioFile from "../../features/admin/master/AudioFile";
 import Product from "../../features/admin/master/Product";
 import OperatorDashboard from "../../features/operator/OperatorDashboard";
 import EmployeeManagement from "../../features/admin/EmployeeManagement";
+import SOPComponent from "../../features/admin/master/SOP";
 
 const AppRoutes = () => {
   const dispatch = useAppDispatch();
@@ -108,11 +109,16 @@ const AppRoutes = () => {
       element: <Profile />,
       requiredPermissions: []
     },
-    { 
-      path: ROUTES.EMPLOYEES, 
+    {
+      path: ROUTES.EMPLOYEES,
       element: <EmployeeManagement />,
       requiredPermissions: []
-    },      
+    },
+    {
+      path: ROUTES.SOP,
+      element: <SOPComponent />,
+      requiredPermissions: []
+    },
   ];
 
   return (
