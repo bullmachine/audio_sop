@@ -54,7 +54,7 @@ const OperatorDashboard: React.FC = () => {
   const { simulateAsync } = useLoader();
   const [assignments, setAssignments] = useState<AudioSop[]>([]);
   const [loading, setLoading] = useState(true);
-    const [sopFilter, setSopFilter] = useState("");
+  const [sopFilter, setSopFilter] = useState("");
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -64,7 +64,7 @@ const OperatorDashboard: React.FC = () => {
   const playTrackAtRef = useRef<(index: number) => Promise<void>>(async () => {});
 
   const playlist = useMemo(() => buildPlaylist(assignments), [assignments]);
-useEffect(() => {
+  useEffect(() => {
   if (!("mediaSession" in navigator)) return;
 
   // ▶ PLAY BUTTON (HEADSET)
@@ -120,11 +120,11 @@ useEffect(() => {
     navigator.mediaSession.setActionHandler("previoustrack", null);
   };
 }, []);
-  useEffect(() => {
+    useEffect(() => {
     playlistRef.current = playlist;
   }, [playlist]);
 
-  useEffect(() => {
+    useEffect(() => {
     currentTrackIndexRef.current = currentTrackIndex;
   }, [currentTrackIndex]);
 
@@ -144,7 +144,7 @@ useEffect(() => {
     setLoading(false);
   };
 
-    const sopOptions = useMemo(() => {
+  const sopOptions = useMemo(() => {
     const map = new Map<string, string>();
     assignments.forEach((a) => {
       map.set(a._id, a.sopName);
@@ -204,7 +204,7 @@ useEffect(() => {
     [stopPlayback]
   );
 
-  useEffect(() => {
+    useEffect(() => {
     playTrackAtRef.current = playTrackAt;
   }, [playTrackAt]);
 
@@ -269,22 +269,22 @@ useEffect(() => {
     [isPlaying, playTrackAt]
   );
 
-  useEffect(() => {
+    useEffect(() => {
     fetchWithLoader();
   }, [sopFilter]);
 
-  useEffect(() => {
+    useEffect(() => {
     const audio = new Audio(); 
     // ✅ ADD THIS
 audio.addEventListener("timeupdate", () => {
-  if ("mediaSession" in navigator) {
-    navigator.mediaSession.setPositionState({
-      duration: audio.duration || 0,
-      playbackRate: audio.playbackRate,
-      position: audio.currentTime,
-    });
-  }
-}); 
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.setPositionState({
+        duration: audio.duration || 0,
+        playbackRate: audio.playbackRate,
+        position: audio.currentTime,
+      });
+    }
+  }); 
     audio.preload = "metadata";
     audioRef.current = audio;
 

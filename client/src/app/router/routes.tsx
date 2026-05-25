@@ -1,10 +1,7 @@
-import { 
+import {
   DashboardOutlined,
-//   SettingOutlined,
   ToolOutlined,
-//   DollarOutlined,
   FileTextOutlined,
-//   HistoryOutlined,
   TeamOutlined,
   UserOutlined,
   KeyOutlined,
@@ -12,8 +9,6 @@ import {
   AudioOutlined,
   SoundOutlined,
   AppstoreOutlined,
-//   CrownOutlined,
-//   CloudSyncOutlined
 } from "@ant-design/icons";
 
 import React from "react";
