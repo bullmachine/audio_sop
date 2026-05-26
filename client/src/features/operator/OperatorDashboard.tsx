@@ -12,6 +12,7 @@ import { Select } from "../../shared/component/Select";
 import NoData from "../../shared/component/NoData";
 import ServiceFactory from "../../services/serviceFactory";
 import type { AudioSop } from "../../services/audioSopService";
+import trackingService from "../../services/trackingService";
 import { useLoader } from "../../shared/hooks/useLoader";
 import { getAudioUrl } from "../../utils/audioUrl";
 import { toast } from "react-toastify";
@@ -62,56 +63,64 @@ const OperatorDashboard: React.FC = () => {
   const playlistRef = useRef<PlaylistTrack[]>([]);
   const currentTrackIndexRef = useRef(-1);
   const playTrackAtRef = useRef<(index: number) => Promise<void>>(async () => {});
+  const trackingStartTimeRef = useRef<Date | null>(null);
+  const currentTrackingIdRef = useRef<string | null>(null);
 
   const playlist = useMemo(() => buildPlaylist(assignments), [assignments]);
   useEffect(() => {
   if (!("mediaSession" in navigator)) return;
 
-  // ▶ PLAY BUTTON (HEADSET)
-  navigator.mediaSession.setActionHandler("play", async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    // ▶ PLAY BUTTON (HEADSET)
+    navigator.mediaSession.setActionHandler("play", async () => {
+      const audio = audioRef.current;
+      if (!audio) return;
 
-    // 👉 IF SONG ENDED → PLAY NEXT
-    if (audio.ended || audio.currentTime === audio.duration) {
+      // 👉 IF SONG ENDED → PLAY NEXT
+      if (audio.ended || audio.currentTime === audio.duration) {
+        const next = currentTrackIndexRef.current + 1;
+
+        if (next < playlistRef.current.length) {
+          await playTrackAtRef.current(next);
+        }
+        return;
+      }
+
+      await audio.play();
+      setIsPlaying(true);
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing";
+      }
+    });
+
+    // ⏸ PAUSE BUTTON
+    navigator.mediaSession.setActionHandler("pause", () => {
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      audio.pause();
+      setIsPlaying(false);
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "paused";
+      }
+    });
+
+    // ⏭ NEXT BUTTON
+    navigator.mediaSession.setActionHandler("nexttrack", async () => {
       const next = currentTrackIndexRef.current + 1;
 
       if (next < playlistRef.current.length) {
         await playTrackAtRef.current(next);
       }
-      return;
-    }
+    });
 
-    await audio.play();
-    setIsPlaying(true);
-  });
+    // ⏮ PREVIOUS BUTTON
+    navigator.mediaSession.setActionHandler("previoustrack", async () => {
+      const prev = currentTrackIndexRef.current - 1;
 
-  // ⏸ PAUSE BUTTON
-  navigator.mediaSession.setActionHandler("pause", () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    audio.pause();
-    setIsPlaying(false);
-  });
-
-  // ⏭ NEXT BUTTON
-  navigator.mediaSession.setActionHandler("nexttrack", async () => {
-    const next = currentTrackIndexRef.current + 1;
-
-    if (next < playlistRef.current.length) {
-      await playTrackAtRef.current(next);
-    }
-  });
-
-  // ⏮ PREVIOUS BUTTON
-  navigator.mediaSession.setActionHandler("previoustrack", async () => {
-    const prev = currentTrackIndexRef.current - 1;
-
-    if (prev >= 0) {
-      await playTrackAtRef.current(prev);
-    }
-  });
+      if (prev >= 0) {
+        await playTrackAtRef.current(prev);
+      }
+    });
 
   return () => {
     navigator.mediaSession.setActionHandler("play", null);
@@ -160,6 +169,8 @@ const OperatorDashboard: React.FC = () => {
     }
     setIsPlaying(false);
     setCurrentTrackIndex(-1);
+    trackingStartTimeRef.current = null;
+    currentTrackingIdRef.current = null;
   }, []);
 
   const playTrackAt = useCallback(
@@ -178,6 +189,27 @@ const OperatorDashboard: React.FC = () => {
         await audio.play();
         setCurrentTrackIndex(index);
         setIsPlaying(true);
+        trackingStartTimeRef.current = new Date();
+
+        // Create tracking record
+        try {
+          const userStr = localStorage.getItem('user');
+          const user = userStr ? JSON.parse(userStr) : null;
+          console.log('User data from localStorage:', user);
+
+          const trackData: any = {
+            tracking_type: 'audio_playback',
+            emp_code: user?.empCode || user?.employee?.emp_code || user?.user?.empCode || 'UNKNOWN',
+            user_name: user?.name || user?.employee?.full_name || user?.employee?.first_name || user?.user?.name || 'Unknown User',
+            audio_sop_id: track.assignmentId,
+            audio_file_id: track.id,
+          };
+      const response = await trackingService.createTracking(trackData);
+          currentTrackingIdRef.current = response.data._id || null;
+        } catch (trackingError) {
+          console.error('Error creating tracking:', trackingError);
+        }
+
         // ✅ HEADSET FIX START
         if ("mediaSession" in navigator) {
           navigator.mediaSession.metadata = new MediaMetadata({
@@ -294,6 +326,18 @@ audio.addEventListener("timeupdate", () => {
       setIsPlaying(false);
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = "paused";
+      }
+
+      // Complete tracking record
+      if (currentTrackingIdRef.current && trackingStartTimeRef.current) {
+        const audioDuration = audio.duration || 0;
+        trackingService.updateTracking(currentTrackingIdRef.current, {
+          status: 'completed',
+          completion_percentage: 100,
+          audio_duration: Math.floor(audioDuration),
+        }).catch(err => console.error('Error updating tracking:', err));
+        currentTrackingIdRef.current = null;
+        trackingStartTimeRef.current = null;
       }
     };
 

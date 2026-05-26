@@ -92,7 +92,7 @@ export const updateTracking = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: 'Tracking record not found' });
     }
 
-    const { status, completion_percentage, playback_speed, notes } = req.body;
+    const { status, completion_percentage, playback_speed, audio_duration, notes } = req.body;
 
     if (tracking.tracking_type === 'login') {
       // Handle login/logout update
@@ -112,11 +112,14 @@ export const updateTracking = async (req: AuthRequest, res: Response) => {
       if (playback_speed !== undefined) tracking.playback_speed = playback_speed;
       if (notes !== undefined) tracking.notes = notes;
 
-      // If completed or interrupted, calculate duration
+      // If completed or interrupted, set end time and duration
       if (status === 'completed' || status === 'interrupted') {
         tracking.status = 'completed';
         tracking.audio_end_time = new Date();
-        if (tracking.audio_start_time) {
+        // Use provided audio_duration if available, otherwise calculate from start time
+        if (audio_duration !== undefined) {
+          tracking.audio_duration = audio_duration;
+        } else if (tracking.audio_start_time) {
           tracking.audio_duration = Math.floor(
             (tracking.audio_end_time.getTime() - tracking.audio_start_time.getTime()) / 1000
           );
@@ -363,6 +366,178 @@ export const getTrackingStats = async (req: Request, res: Response) => {
     console.error('Error fetching tracking stats:', error);
     res.status(500).json({
       message: 'Failed to fetch tracking stats',
+      error: (error as Error).message,
+    });
+  }
+};
+
+// Get employee date-wise analysis
+export const getEmployeeDateWiseAnalysis = async (req: Request, res: Response) => {
+  try {
+    const { start_date, end_date, emp_code, machine_number } = req.query;
+
+    const matchQuery: any = { tracking_type: 'audio_playback' };
+
+    if (start_date && end_date) {
+      matchQuery.created_at = {
+        $gte: new Date(start_date as string),
+        $lte: new Date(end_date as string),
+      };
+    }
+
+    if (emp_code) {
+      matchQuery.emp_code = emp_code;
+    }
+
+    if (machine_number) {
+      matchQuery.machine_number = machine_number;
+    }
+
+    // Aggregate by employee, date, and machine with SOP details
+    const analysis = await Tracking.aggregate([
+      { $match: matchQuery },
+      {
+        $addFields: {
+          date: {
+            $dateToString: { format: '%Y-%m-%d', date: '$created_at' },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            emp_code: '$emp_code',
+            date: '$date',
+            machine_number: '$machine_number',
+            audio_sop_id: '$audio_sop_id',
+          },
+          totalSessions: { $sum: 1 },
+          completedSessions: {
+            $sum: {
+              $cond: [{ $eq: ['$playback_status', 'completed'] }, 1, 0],
+            },
+          },
+          totalDuration: { $sum: { $ifNull: ['$audio_duration', 0] } },
+          avgDuration: { $avg: { $ifNull: ['$audio_duration', 0] } },
+          avgCompletionPercentage: { $avg: '$completion_percentage' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: '_id.emp_code',
+          foreignField: 'emp_code',
+          as: 'employee',
+        },
+      },
+      {
+        $unwind: { path: '$employee', preserveNullAndEmptyArrays: true },
+      },
+      {
+        $lookup: {
+          from: 'audiosops',
+          localField: '_id.audio_sop_id',
+          foreignField: '_id',
+          as: 'sop',
+        },
+      },
+      {
+        $unwind: { path: '$sop', preserveNullAndEmptyArrays: true },
+      },
+      {
+        $addFields: {
+          user_name: {
+            $ifNull: [
+              '$employee.full_name',
+              { $concat: ['$employee.first_name', ' ', '$employee.last_name'] },
+              '$employee.first_name',
+              'Unknown Employee'
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          emp_code: '$_id.emp_code',
+          user_name: 1,
+          date: '$_id.date',
+          machine_number: '$_id.machine_number',
+          audio_sop_id: '$_id.audio_sop_id',
+          sop_title: { $ifNull: ['$sop.title', 'Unknown SOP'] },
+          totalSessions: 1,
+          completedSessions: 1,
+          totalDuration: { $round: ['$totalDuration', 2] },
+          avgDuration: { $round: ['$avgDuration', 2] },
+          avgCompletionPercentage: { $round: ['$avgCompletionPercentage', 2] },
+        },
+      },
+      { $sort: { date: -1, emp_code: 1, machine_number: 1 } },
+    ]);
+
+    // Get overall summary
+    const summary = await Tracking.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: '$emp_code',
+          totalSessions: { $sum: 1 },
+          completedSessions: {
+            $sum: {
+              $cond: [{ $eq: ['$playback_status', 'completed'] }, 1, 0],
+            },
+          },
+          totalDuration: { $sum: { $ifNull: ['$audio_duration', 0] } },
+          avgDuration: { $avg: { $ifNull: ['$audio_duration', 0] } },
+        },
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: '_id',
+          foreignField: 'emp_code',
+          as: 'employee',
+        },
+      },
+      {
+        $unwind: { path: '$employee', preserveNullAndEmptyArrays: true },
+      },
+      {
+        $addFields: {
+          user_name: {
+            $ifNull: [
+              '$employee.full_name',
+              { $concat: ['$employee.first_name', ' ', '$employee.last_name'] },
+              '$employee.first_name',
+              'Unknown Employee'
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          emp_code: '$_id',
+          user_name: 1,
+          totalSessions: 1,
+          completedSessions: 1,
+          totalDuration: { $round: ['$totalDuration', 2] },
+          avgDuration: { $round: ['$avgDuration', 2] },
+        },
+      },
+      { $sort: { emp_code: 1 } },
+    ]);
+
+    res.status(200).json({
+      data: {
+        dateWise: analysis,
+        summary,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching employee date-wise analysis:', error);
+    res.status(500).json({
+      message: 'Failed to fetch employee date-wise analysis',
       error: (error as Error).message,
     });
   }

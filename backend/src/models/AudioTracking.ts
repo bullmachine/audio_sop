@@ -17,6 +17,7 @@ export interface ITracking extends Document {
   stage_id?: mongoose.Types.ObjectId;
   language_id?: mongoose.Types.ObjectId;
   cycle_number?: number;
+  machine_number?: string;
   audio_start_time?: Date;
   audio_end_time?: Date;
   audio_duration?: number; // in seconds
@@ -55,6 +56,7 @@ const TrackingSchema: Schema = new Schema(
     stage_id: { type: Schema.Types.ObjectId, ref: 'Stage' },
     language_id: { type: Schema.Types.ObjectId, ref: 'Language' },
     cycle_number: { type: Number, default: 1 },
+    machine_number: { type: String },
     audio_start_time: { type: Date },
     audio_end_time: { type: Date },
     audio_duration: { type: Number }, // in seconds

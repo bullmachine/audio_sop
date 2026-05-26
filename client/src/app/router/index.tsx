@@ -27,6 +27,7 @@ import Product from "../../features/admin/master/Product";
 import OperatorDashboard from "../../features/operator/OperatorDashboard";
 import EmployeeManagement from "../../features/admin/EmployeeManagement";
 import SOPComponent from "../../features/admin/master/SOP";
+import EmployeeAnalysis from "../../features/admin/EmployeeAnalysis";
 
 const AppRoutes = () => {
   const dispatch = useAppDispatch();
@@ -117,6 +118,11 @@ const AppRoutes = () => {
     {
       path: ROUTES.SOP,
       element: <SOPComponent />,
+      requiredPermissions: []
+    },
+    {
+      path: ROUTES.EMPLOYEE_ANALYSIS,
+      element: <EmployeeAnalysis />,
       requiredPermissions: []
     },
   ];

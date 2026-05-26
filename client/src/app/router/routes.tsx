@@ -9,6 +9,9 @@ import {
   AudioOutlined,
   SoundOutlined,
   AppstoreOutlined,
+  BarChartOutlined,
+//   CrownOutlined,
+//   CloudSyncOutlined
 } from "@ant-design/icons";
 
 import React from "react";
@@ -31,6 +34,7 @@ export const ROUTES = {
     AUDIO_FILES: "/audio-files",
     EMPLOYEES: "/employees",
     SOP: "/sop",
+    EMPLOYEE_ANALYSIS: "/employee-analysis",
 };
 
 export type MenuItem = {
@@ -53,7 +57,7 @@ export const MenuItems: MenuItem[] = [
         path: ROUTES.MY_AUDIO,
         icon: <AudioOutlined />,
         requiredPermissions: [ ]
-    },    
+    },
     {
         name: "Process Master",
         icon: <ToolOutlined />,
@@ -63,13 +67,13 @@ export const MenuItems: MenuItem[] = [
                 path: ROUTES.STAGE,
                 icon: <ToolOutlined />,
                 requiredPermissions: [ ]
-            },           
+            },
             {
                 name: "Language",
                 path: ROUTES.LANGUAGE,
                 icon: <FileTextOutlined />,
                 requiredPermissions: [ ]
-            },     
+            },
             {
                 name: "Operators",
                 path: ROUTES.OPERATOR,
@@ -81,7 +85,7 @@ export const MenuItems: MenuItem[] = [
                 path: ROUTES.PRODUCT,
                 icon: <AppstoreOutlined />,
                 requiredPermissions: [ ],
-            },          
+            },
             {
                 name: "Audio Files",
                 path: ROUTES.AUDIO_FILES,
@@ -101,27 +105,27 @@ export const MenuItems: MenuItem[] = [
         name: "Access Control",
         icon: <SafetyOutlined />,
         subItems: [
-            { 
-                name: "Roles", 
-                path: ROUTES.ROLE, 
+            {
+                name: "Roles",
+                path: ROUTES.ROLE,
                 icon: <TeamOutlined />,
                 requiredPermissions: [{ module: "Role", action: "view" }]
-            }, 
-            { 
-                name: "Role User", 
-                path: ROUTES.ROLE_USER, 
+            },
+            {
+                name: "Role User",
+                path: ROUTES.ROLE_USER,
                 icon: <UserOutlined />,
                 requiredPermissions: [{ module: "Role User", action: "view" }]
-            }, 
-            { 
-                name: "Permissions", 
-                path: ROUTES.PERMISSION, 
+            },
+            {
+                name: "Permissions",
+                path: ROUTES.PERMISSION,
                 icon: <SafetyOutlined />,
                 requiredPermissions: [{ module: "Permission", action: "view" }]
-            }, 
-            { 
-                name: "User Permissions", 
-                path: ROUTES.USER_PERMISSIONS, 
+            },
+            {
+                name: "User Permissions",
+                path: ROUTES.USER_PERMISSIONS,
                 icon: <KeyOutlined />,
                 requiredPermissions: [{ module: "User Permissions", action: "view" }]
             }
@@ -132,5 +136,17 @@ export const MenuItems: MenuItem[] = [
         path: ROUTES.EMPLOYEES,
         icon: <TeamOutlined />,
         requiredPermissions: []
+    },
+    {
+        name: "Reports",
+        icon: <BarChartOutlined />,
+        subItems: [
+            {
+                name: "Employee Analysis",
+                path: ROUTES.EMPLOYEE_ANALYSIS,
+                icon: <BarChartOutlined />,
+                requiredPermissions: []
+            }
+        ]
     }
 ];

@@ -19,6 +19,7 @@ export interface Tracking {
   stage_id?: string;
   language_id?: string;
   cycle_number?: number;
+  machine_number?: string;
   audio_start_time?: string;
   audio_end_time?: string;
   audio_duration?: number;
@@ -73,6 +74,7 @@ class TrackingService {
     product_id?: string;
     stage_id?: string;
     language_id?: string;
+    machine_number?: string;
   }): Promise<{ message: string; data: Tracking }> {
     return apiRequest.post(this.endpoint, data);
   }
@@ -82,6 +84,7 @@ class TrackingService {
     status?: 'active' | 'completed' | 'terminated' | 'playing' | 'paused' | 'interrupted';
     completion_percentage?: number;
     playback_speed?: number;
+    audio_duration?: number;
     notes?: string;
   }): Promise<{ message: string; data: Tracking }> {
     return apiRequest.put(`${this.endpoint}/${trackingId}`, data);
