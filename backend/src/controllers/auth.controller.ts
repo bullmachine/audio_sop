@@ -130,23 +130,44 @@ export const login = async (req: Request, res: Response) => {
         else if (/tablet/i.test(user_agent)) device_type = 'tablet';
       }
 
-      const logData: any = {
+      // Get today's date (without time)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Find or create daily tracking record
+      let dailyTracking = await Tracking.findOne({
         user_id: user._id,
         emp_code: employee.emp_code,
-        user_name: employee.full_name || employee.first_name || user.name,
-        tracking_type: 'login',
+        date: today,
+      });
+
+      if (!dailyTracking) {
+        const created = await Tracking.create([{
+          user_id: user._id,
+          emp_code: employee.emp_code,
+          user_name: employee.full_name || employee.first_name || user.name,
+          operator_id: operator.empCode || undefined,
+          date: today,
+          sessions: [],
+        }] as any);
+        dailyTracking = created[0];
+      }
+
+      // Create new login session
+      const newSession = {
         login_time: new Date(),
         ip_address,
         user_agent,
         device_type,
         status: 'active',
+        audio_playbacks: [],
       };
 
-      // Include operator_id from the validated operator
-      logData.operator_id = operator.empCode;
-
-      const trackingRecord = new Tracking(logData);
-      await trackingRecord.save();
+      if (dailyTracking) {
+        dailyTracking.sessions.push(newSession as any);
+        (dailyTracking as any).updated_at = new Date();
+        await dailyTracking.save();
+      }
     } catch (logError) {
       // Log error but don't fail the login
       console.error('Error creating login tracking:', logError);

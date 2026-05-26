@@ -81,6 +81,7 @@ class TrackingService {
 
   // Update tracking record
   async updateTracking(trackingId: string, data: {
+    update_type?: 'login' | 'audio_playback';
     status?: 'active' | 'completed' | 'terminated' | 'playing' | 'paused' | 'interrupted';
     completion_percentage?: number;
     playback_speed?: number;

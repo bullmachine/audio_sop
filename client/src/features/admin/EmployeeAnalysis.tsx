@@ -13,11 +13,15 @@ interface DateWiseData {
   machine_number?: string;
   audio_sop_id?: string;
   sop_title?: string;
+  cycle_number?: number;
   totalSessions: number;
   completedSessions: number;
-  totalDuration: number;
+  totalDuration: number; // Time from first to last audio
+  playbackDuration: number; // Sum of individual play times
   avgDuration: number;
   avgCompletionPercentage: number;
+  loginTimes?: string[];
+  logoutTimes?: (string | null)[];
 }
 
 interface SummaryData {
@@ -394,16 +398,19 @@ const EmployeeAnalysis: React.FC = () => {
                                 <thead>
                                   <tr className="border-b border-gray-200 dark:border-gray-600">
                                     <th className="text-left py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">SOP</th>
+                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Cycle</th>
                                     <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Sessions</th>
                                     <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Completed</th>
                                     <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Completion %</th>
-                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Duration</th>
+                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Total Duration</th>
+                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Playback Duration</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {machine.sops.map((sop, sopIndex) => (
                                     <tr key={sopIndex} className="border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                       <td className="py-2 px-3 text-xs text-gray-900 dark:text-white">{sop.sop_title || 'Unknown SOP'}</td>
+                                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">{sop.cycle_number || 1}</td>
                                       <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">{sop.totalSessions}</td>
                                       <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">
                                         <span className="flex items-center justify-center gap-1">
@@ -426,6 +433,12 @@ const EmployeeAnalysis: React.FC = () => {
                                         <span className="flex items-center justify-center gap-1">
                                           <ClockCircleOutlined className="text-blue-500 text-xs" />
                                           {formatDuration(sop.totalDuration)}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">
+                                        <span className="flex items-center justify-center gap-1">
+                                          <ClockCircleOutlined className="text-purple-500 text-xs" />
+                                          {formatDuration(sop.playbackDuration)}
                                         </span>
                                       </td>
                                     </tr>

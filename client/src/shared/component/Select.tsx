@@ -6,10 +6,10 @@ interface SelectProps {
   error?: string;
   className?: string;
   labelclassName?: string;
-  options?: { label: string; value: string }[];  
+  options?: { label: string; value: string }[];
   searchable?: boolean;
   searchPlaceholder?: string;
-  value?: string;
+  value?: string | null;
   onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   required?: boolean;
   disabled?: boolean;
@@ -169,7 +169,7 @@ const Select = React.forwardRef<HTMLInputElement | HTMLSelectElement, SelectProp
                   ? "border-red-500 focus:ring-red-500"
                   : "border-gray-300 dark:border-gray-600 focus:ring-blue-500"
               } ${disabled ? "bg-gray-100 cursor-not-allowed opacity-50" : ""} ${className}`}
-              value={value}
+              value={value ?? ""}
               onChange={onChange}
               disabled={disabled}
               {...props}

@@ -55,7 +55,8 @@ const OperatorDashboard: React.FC = () => {
   const { simulateAsync } = useLoader();
   const [assignments, setAssignments] = useState<AudioSop[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sopFilter, setSopFilter] = useState("");
+  const [sopFilter, setSopFilter] = useState<string | null>(null);
+  const [availableSops, setAvailableSops] = useState<{ label: string; value: string }[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -140,9 +141,11 @@ const OperatorDashboard: React.FC = () => {
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
   const fetchAssignments = async () => {
-    const params: Record<string, string> = {};
-    if (sopFilter) params.sop = sopFilter;
-
+    if (!sopFilter) {
+      setAssignments([]);
+      return;
+    }
+    const params: Record<string, string> = { sop: sopFilter };
     const response = await ServiceFactory.audioSopService.getMyAssignments(params);
     setAssignments(response.data || []);
   };
@@ -154,12 +157,8 @@ const OperatorDashboard: React.FC = () => {
   };
 
   const sopOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    assignments.forEach((a) => {
-      map.set(a._id, a.sopName);
-    });
-    return [{ label: "All SOPs", value: "" }, ...Array.from(map, ([value, label]) => ({ value, label }))];
-  }, [assignments]);
+    return [{ label: "Select SOP", value: "" }, ...availableSops];
+  }, [availableSops]);
 
   const stopPlayback = useCallback(() => {
     const audio = audioRef.current;
@@ -301,8 +300,29 @@ const OperatorDashboard: React.FC = () => {
     [isPlaying, playTrackAt]
   );
 
-    useEffect(() => {
-    fetchWithLoader();
+  useEffect(() => {
+    const fetchAvailableSops = async () => {
+      try {
+        const response = await ServiceFactory.audioSopService.getActive();
+        const sops = response.data.map((s: any) => ({
+          label: s.sopName,
+          value: s._id,
+        }));
+        setAvailableSops(sops);
+      } catch (error) {
+        console.error("Error fetching available SOPs:", error);
+      }
+    };
+    fetchAvailableSops();
+  }, []);
+
+  useEffect(() => {
+    if (sopFilter !== null) {
+      fetchWithLoader();
+    } else {
+      setAssignments([]);
+      setLoading(false);
+    }
   }, [sopFilter]);
 
     useEffect(() => {
@@ -332,6 +352,7 @@ audio.addEventListener("timeupdate", () => {
       if (currentTrackingIdRef.current && trackingStartTimeRef.current) {
         const audioDuration = audio.duration || 0;
         trackingService.updateTracking(currentTrackingIdRef.current, {
+          update_type: 'audio_playback',
           status: 'completed',
           completion_percentage: 100,
           audio_duration: Math.floor(audioDuration),
