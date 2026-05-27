@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarOutlined, UserOutlined, ClockCircleOutlined, CheckCircleOutlined, InfoCircleOutlined, BarChartOutlined, FilterOutlined } from "@ant-design/icons";
+import { ClockCircleOutlined, CheckCircleOutlined, InfoCircleOutlined, BarChartOutlined, FilterOutlined, ThunderboltOutlined, StarOutlined, TeamOutlined, DesktopOutlined, FileTextOutlined } from "@ant-design/icons";
 import Breadcrumbs from "../../shared/component/Breadcrumbs";
 import { Input } from "../../shared/component/Input";
 import trackingService from "../../services/trackingService";
@@ -16,12 +16,11 @@ interface DateWiseData {
   cycle_number?: number;
   totalSessions: number;
   completedSessions: number;
-  totalDuration: number; // Time from first to last audio
-  playbackDuration: number; // Sum of individual play times
+  totalDuration: number;
+  dayTotalDuration: number;
+  playbackDuration: number;
   avgDuration: number;
   avgCompletionPercentage: number;
-  loginTimes?: string[];
-  logoutTimes?: (string | null)[];
 }
 
 interface SummaryData {
@@ -58,6 +57,9 @@ interface EmployeeWithDates {
   avgDuration: number;
   uniqueMachines: number;
   dates: DateWithMachines[];
+  mostUsedMachine?: string;
+  mostPlayedSOP?: string;
+  avgSessionDuration?: number;
 }
 
 const EmployeeAnalysis: React.FC = () => {
@@ -69,6 +71,9 @@ const EmployeeAnalysis: React.FC = () => {
   const [groupedData, setGroupedData] = useState<EmployeeWithDates[]>([]);
   const [showDebug, setShowDebug] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [overallTotals, setOverallTotals] = useState<{ totalSessions: number; completedSessions: number; totalDuration: number }>({ totalSessions: 0, completedSessions: 0, totalDuration: 0 });
 
   const fetchAnalysis = async () => {
     try {
@@ -82,11 +87,11 @@ const EmployeeAnalysis: React.FC = () => {
       const response = await trackingService.getEmployeeDateWiseAnalysis(params);
       const dateWise = response.data.dateWise || [];
       const summary = response.data.summary || [];
+      const totals = response.data.overallTotals || { totalSessions: 0, completedSessions: 0, totalDuration: 0 };
 
-      // Store debug data
-      setDebugData({ dateWise, summary, params });
+      setDebugData({ dateWise, summary, totals, params });
+      setOverallTotals(totals);
 
-      // Group by employee -> date -> machine -> SOP
       const grouped: { [key: string]: EmployeeWithDates } = {};
       dateWise.forEach((item: DateWiseData) => {
         const empKey = item.emp_code;
@@ -101,10 +106,10 @@ const EmployeeAnalysis: React.FC = () => {
             avgDuration: summaryItem?.avgDuration || 0,
             uniqueMachines: 0,
             dates: [],
+            avgSessionDuration: summaryItem?.avgDuration || 0,
           };
         }
 
-        // Find or create date entry
         let dateEntry = grouped[empKey].dates.find(d => d.date === item.date);
         if (!dateEntry) {
           dateEntry = {
@@ -117,7 +122,6 @@ const EmployeeAnalysis: React.FC = () => {
           grouped[empKey].dates.push(dateEntry);
         }
 
-        // Find or create machine entry
         let machineEntry = dateEntry.machines.find(m => m.machine_number === item.machine_number);
         if (!machineEntry) {
           machineEntry = {
@@ -130,37 +134,50 @@ const EmployeeAnalysis: React.FC = () => {
           dateEntry.machines.push(machineEntry);
         }
 
-        // Add SOP data
         machineEntry.sops.push(item);
         machineEntry.totalSessions += item.totalSessions;
         machineEntry.completedSessions += item.completedSessions;
         machineEntry.totalDuration += item.totalDuration;
 
-        // Update date totals
         dateEntry.totalSessions += item.totalSessions;
         dateEntry.completedSessions += item.completedSessions;
         dateEntry.totalDuration += item.totalDuration;
       });
 
-      // Sort dates descending and calculate unique machines
       Object.values(grouped).forEach(emp => {
         emp.dates.sort((a, b) => b.date.localeCompare(a.date));
         emp.dates.forEach(date => {
           date.machines.sort((a, b) => {
-            const aMachine = a.machine_number || '';
-            const bMachine = b.machine_number || '';
+            const aMachine = a.machine_number || "";
+            const bMachine = b.machine_number || "";
             return aMachine.localeCompare(bMachine);
           });
         });
 
-        // Calculate unique machines
         const machines = new Set<string>();
+        const machineUsage: { [key: string]: number } = {};
+        const sopUsage: { [key: string]: number } = {};
+
         emp.dates.forEach(date => {
           date.machines.forEach(machine => {
-            if (machine.machine_number) machines.add(machine.machine_number);
+            if (machine.machine_number) {
+              machines.add(machine.machine_number);
+              machineUsage[machine.machine_number] = (machineUsage[machine.machine_number] || 0) + machine.totalSessions;
+            }
+            machine.sops.forEach(sop => {
+              if (sop.sop_title) {
+                sopUsage[sop.sop_title] = (sopUsage[sop.sop_title] || 0) + sop.totalSessions;
+              }
+            });
           });
         });
         emp.uniqueMachines = machines.size;
+        
+        const mostUsedMachine = Object.entries(machineUsage).sort((a, b) => b[1] - a[1])[0];
+        emp.mostUsedMachine = mostUsedMachine ? mostUsedMachine[0] : undefined;
+        
+        const mostPlayedSOP = Object.entries(sopUsage).sort((a, b) => b[1] - a[1])[0];
+        emp.mostPlayedSOP = mostPlayedSOP ? mostPlayedSOP[0] : undefined;
       });
 
       setGroupedData(Object.values(grouped).sort((a, b) => a.emp_code.localeCompare(b.emp_code)));
@@ -173,13 +190,12 @@ const EmployeeAnalysis: React.FC = () => {
   };
 
   useEffect(() => {
-    // Set default date range to last 30 days
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(today.getDate() - 30);
 
-    setEndDate(today.toISOString().split('T')[0]);
-    setStartDate(thirtyDaysAgo.toISOString().split('T')[0]);
+    setEndDate(today.toISOString().split("T")[0]);
+    setStartDate(thirtyDaysAgo.toISOString().split("T")[0]);
   }, []);
 
   useEffect(() => {
@@ -201,259 +217,388 @@ const EmployeeAnalysis: React.FC = () => {
     return Math.round((completed / total) * 100);
   };
 
+  const toggleEmployee = (empCode: string) => {
+    const newExpanded = new Set(expandedEmployees);
+    if (newExpanded.has(empCode)) {
+      newExpanded.delete(empCode);
+    } else {
+      newExpanded.add(empCode);
+    }
+    setExpandedEmployees(newExpanded);
+  };
+
+  const toggleDate = (empCode: string, date: string) => {
+    const key = `${empCode}-${date}`;
+    const newExpanded = new Set(expandedDates);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedDates(newExpanded);
+  };
+
   return (
     <div className="w-full pb-28">
       <Breadcrumbs
-        className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg dark:from-gray-800 dark:to-gray-800"
+        className="p-4 bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 rounded-xl dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700"
         headTitle="Employee Analysis"
         items={[{ label: "Reports", path: "/reports" }, { label: "Employee Analysis", path: "/employee-analysis" }]}
       />
 
-      <div className="mb-6 p-5 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-6 p-6 bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-              <BarChartOutlined /> Employee Date-wise Analysis
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+              <BarChartOutlined className="text-blue-600 dark:text-blue-400" /> Employee Date-wise Analysis
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              View audio tracking analysis by employee with date-wise breakdown
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Comprehensive audio tracking analytics with performance insights
             </p>
           </div>
           <button
             onClick={() => setShowDebug(!showDebug)}
-            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+            className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all duration-200 flex items-center gap-2 font-medium"
           >
             <InfoCircleOutlined /> {showDebug ? "Hide Debug" : "Show Debug"}
           </button>
         </div>
 
-        {/* Debug Panel */}
         {showDebug && debugData && (
-          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-            <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Debug Information</h4>
-            <div className="text-xs text-gray-700 dark:text-gray-300 space-y-2">
-              <div><strong>Request Params:</strong> {JSON.stringify(debugData.params, null, 2)}</div>
-              <div><strong>DateWise Records:</strong> {debugData.dateWise.length} records</div>
-              <div><strong>Summary Records:</strong> {debugData.summary.length} records</div>
-              <div className="max-h-40 overflow-auto">
-                <strong>Sample DateWise Data:</strong>
+          <div className="mb-5 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
+            <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-2">
+              <InfoCircleOutlined /> Debug Information
+            </h4>
+            <div className="text-xs text-slate-700 dark:text-slate-300 space-y-2 font-mono">
+              <div><strong className="text-amber-700 dark:text-amber-400">Request Params:</strong> {JSON.stringify(debugData.params, null, 2)}</div>
+              <div><strong className="text-amber-700 dark:text-amber-400">DateWise Records:</strong> {debugData.dateWise.length} records</div>
+              <div><strong className="text-amber-700 dark:text-amber-400">Summary Records:</strong> {debugData.summary.length} records</div>
+              <div><strong className="text-amber-700 dark:text-amber-400">Overall Totals:</strong> {JSON.stringify(debugData.totals, null, 2)}</div>
+              <div className="max-h-40 overflow-auto bg-white dark:bg-slate-800 p-2 rounded-lg">
+                <strong className="text-amber-700 dark:text-amber-400">Sample DateWise Data:</strong>
                 <pre className="mt-1 text-xs">{JSON.stringify(debugData.dateWise.slice(0, 2), null, 2)}</pre>
               </div>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Input
-            type="date"
-            label="Start Date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-          <Input
-            type="date"
-            label="End Date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-          <Input
-            placeholder="Employee Code (Optional)"
-            value={empCode}
-            onChange={(e) => setEmpCode(e.target.value)}
-          />
-          <Input
-            placeholder="Machine Number (Optional)"
-            value={machineNumber}
-            onChange={(e) => setMachineNumber(e.target.value)}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Start Date</label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="rounded-xl"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">End Date</label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="rounded-xl"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Employee Code</label>
+            <Input
+              placeholder="Optional filter"
+              value={empCode}
+              onChange={(e) => setEmpCode(e.target.value)}
+              className="rounded-xl"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Machine Number</label>
+            <Input
+              placeholder="Optional filter"
+              value={machineNumber}
+              onChange={(e) => setMachineNumber(e.target.value)}
+              className="rounded-xl"
+            />
+          </div>
         </div>
         <button
           onClick={fetchAnalysis}
           disabled={loading}
-          className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+          className="mt-5 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 disabled:opacity-50 flex items-center gap-2 font-semibold shadow-lg shadow-blue-500/25 dark:shadow-blue-500/10"
         >
           <FilterOutlined /> {loading ? "Loading..." : "Apply Filters"}
         </button>
       </div>
 
-      {/* Employee-wise Section with Date-wise Details */}
       {groupedData.length > 0 ? (
         <>
-          {/* Overall Stats Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl shadow-lg text-white">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div className="p-5 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 rounded-2xl shadow-xl shadow-blue-500/20 dark:shadow-blue-500/10 text-white border border-blue-500/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm">Total Employees</p>
-                  <p className="text-2xl font-bold">{groupedData.length}</p>
+                  <p className="text-blue-100 text-xs font-medium uppercase tracking-wide mb-1">Total Employees</p>
+                  <p className="text-3xl font-bold">{groupedData.length}</p>
                 </div>
-                <UserOutlined className="text-3xl opacity-50" />
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <TeamOutlined className="text-2xl" />
+                </div>
               </div>
             </div>
-            <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 rounded-xl shadow-lg text-white">
+            <div className="p-5 bg-gradient-to-br from-purple-600 to-purple-700 dark:from-purple-700 dark:to-purple-800 rounded-2xl shadow-xl shadow-purple-500/20 dark:shadow-purple-500/10 text-white border border-purple-500/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-100 text-sm">Total Sessions</p>
-                  <p className="text-2xl font-bold">{groupedData.reduce((sum, emp) => sum + emp.totalSessions, 0)}</p>
+                  <p className="text-purple-100 text-xs font-medium uppercase tracking-wide mb-1">Total Sessions</p>
+                  <p className="text-3xl font-bold">{overallTotals.totalSessions}</p>
                 </div>
-                <BarChartOutlined className="text-3xl opacity-50" />
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <BarChartOutlined className="text-2xl" />
+                </div>
               </div>
             </div>
-            <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 rounded-xl shadow-lg text-white">
+            <div className="p-5 bg-gradient-to-br from-emerald-600 to-emerald-700 dark:from-emerald-700 dark:to-emerald-800 rounded-2xl shadow-xl shadow-emerald-500/20 dark:shadow-emerald-500/10 text-white border border-emerald-500/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-green-100 text-sm">Completed Sessions</p>
-                  <p className="text-2xl font-bold">{groupedData.reduce((sum, emp) => sum + emp.completedSessions, 0)}</p>
+                  <p className="text-emerald-100 text-xs font-medium uppercase tracking-wide mb-1">Completed</p>
+                  <p className="text-3xl font-bold">{overallTotals.completedSessions}</p>
                 </div>
-                <CheckCircleOutlined className="text-3xl opacity-50" />
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <CheckCircleOutlined className="text-2xl" />
+                </div>
               </div>
             </div>
-            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 rounded-xl shadow-lg text-white">
+            <div className="p-5 bg-gradient-to-br from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-800 rounded-2xl shadow-xl shadow-amber-500/20 dark:shadow-amber-500/10 text-white border border-amber-500/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm">Total Duration</p>
-                  <p className="text-2xl font-bold">{formatDuration(groupedData.reduce((sum, emp) => sum + emp.totalDuration, 0))}</p>
+                  <p className="text-amber-100 text-xs font-medium uppercase tracking-wide mb-1">Total Duration</p>
+                  <p className="text-3xl font-bold">{formatDuration(overallTotals.totalDuration)}</p>
                 </div>
-                <ClockCircleOutlined className="text-3xl opacity-50" />
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <ClockCircleOutlined className="text-2xl" />
+                </div>
+              </div>
+            </div>
+            <div className="p-5 bg-gradient-to-br from-rose-600 to-pink-600 dark:from-rose-700 dark:to-pink-800 rounded-2xl shadow-xl shadow-rose-500/20 dark:shadow-rose-500/10 text-white border border-rose-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-rose-100 text-xs font-medium uppercase tracking-wide mb-1">Avg Duration</p>
+                  <p className="text-3xl font-bold">{formatDuration(groupedData.length > 0 ? groupedData.reduce((sum, emp) => sum + emp.avgDuration, 0) / groupedData.length : 0)}</p>
+                </div>
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <ThunderboltOutlined className="text-2xl" />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Employee Cards */}
-          <div className="space-y-6">
-            {groupedData.map((employee) => (
-              <div key={employee.emp_code} className="p-5 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-                {/* Employee Summary Header */}
-                <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-700 rounded-lg">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <UserOutlined /> {employee.emp_code} - {employee.user_name}
-                      </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {employee.dates.length} active days • {employee.uniqueMachines} unique machine(s)
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      <div className="text-gray-700 dark:text-gray-300">
-                        <span className="font-medium">Total Sessions:</span> {employee.totalSessions}
-                      </div>
-                      <div className="text-gray-700 dark:text-gray-300">
-                        <span className="font-medium">Completed:</span> {employee.completedSessions}
-                      </div>
-                      <div className="text-gray-700 dark:text-gray-300">
-                        <span className="font-medium">Completion:</span>
-                        <span className={`ml-1 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-700/50 dark:to-slate-700 border-b-2 border-slate-200 dark:border-slate-600">
+                  <th className="text-left py-4 px-5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Employee</th>
+                  <th className="text-center py-4 px-4 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Sessions</th>
+                  <th className="text-center py-4 px-4 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Completed</th>
+                  <th className="text-center py-4 px-4 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Rate</th>
+                  <th className="text-center py-4 px-4 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Total Time</th>
+                  <th className="text-center py-4 px-4 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Avg/Session</th>
+                  <th className="text-center py-4 px-4 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedData.map((employee) => (
+                  <React.Fragment key={employee.emp_code}>
+                    <tr className="border-b border-slate-100 dark:border-slate-700 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 dark:hover:from-slate-700/30 dark:hover:to-slate-700/30 cursor-pointer transition-all duration-200">
+                      <td onClick={() => toggleEmployee(employee.emp_code)} className="py-4 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-blue-500/30">
+                            {employee.user_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-slate-900 dark:text-white">
+                              {employee.emp_code}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                              {employee.user_name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                <DesktopOutlined className="text-[10px]" /> {employee.uniqueMachines}
+                              </span>
+                              {employee.mostUsedMachine && (
+                                <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                  <StarOutlined className="text-[10px]" /> {employee.mostUsedMachine}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td onClick={() => toggleEmployee(employee.emp_code)} className="py-4 px-4 text-center">
+                        <span className="inline-flex items-center px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-semibold">
+                          {employee.totalSessions}
+                        </span>
+                      </td>
+                      <td onClick={() => toggleEmployee(employee.emp_code)} className="py-4 px-4 text-center">
+                        <span className="inline-flex items-center px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-lg text-sm font-semibold">
+                          {employee.completedSessions}
+                        </span>
+                      </td>
+                      <td onClick={() => toggleEmployee(employee.emp_code)} className="py-4 px-4 text-center">
+                        <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold ${
                           completionRate(employee.completedSessions, employee.totalSessions) >= 80
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
                             : completionRate(employee.completedSessions, employee.totalSessions) >= 50
-                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
                         }`}>
                           {completionRate(employee.completedSessions, employee.totalSessions)}%
                         </span>
-                      </div>
-                      <div className="text-gray-700 dark:text-gray-300">
-                        <span className="font-medium">Total Duration:</span> {formatDuration(employee.totalDuration)}
-                      </div>
-                      <div className="text-gray-700 dark:text-gray-300">
-                        <span className="font-medium">Avg Duration:</span> {formatDuration(employee.avgDuration)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Date-wise Breakdown with Machines and SOPs */}
-                <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <CalendarOutlined /> Date-wise Breakdown (Machine & SOP-wise)
-                </h4>
-                <div className="space-y-4">
-                  {employee.dates.map((dateItem, dateIndex) => (
-                    <div key={dateIndex} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      {/* Date Header */}
-                      <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-2 flex items-center justify-between">
-                        <span className="font-medium text-gray-900 dark:text-white">{dateItem.date}</span>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {dateItem.machines.length} machine(s) • {dateItem.totalSessions} sessions • {formatDuration(dateItem.totalDuration)}
-                        </span>
-                      </div>
-
-                      {/* Machines and SOPs */}
-                      <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {dateItem.machines.map((machine, machineIndex) => (
-                          <div key={machineIndex} className="p-3">
-                            {/* Machine Header */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-semibold text-gray-900 dark:text-white">
-                                {machine.machine_number || 'No Machine'}
-                              </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                ({machine.totalSessions} sessions • {formatDuration(machine.totalDuration)})
-                              </span>
-                            </div>
-
-                            {/* SOPs Table */}
-                            <div className="ml-4 overflow-x-auto">
-                              <table className="w-full">
-                                <thead>
-                                  <tr className="border-b border-gray-200 dark:border-gray-600">
-                                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">SOP</th>
-                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Cycle</th>
-                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Sessions</th>
-                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Completed</th>
-                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Completion %</th>
-                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Total Duration</th>
-                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-600 dark:text-gray-400">Playback Duration</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {machine.sops.map((sop, sopIndex) => (
-                                    <tr key={sopIndex} className="border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                      <td className="py-2 px-3 text-xs text-gray-900 dark:text-white">{sop.sop_title || 'Unknown SOP'}</td>
-                                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">{sop.cycle_number || 1}</td>
-                                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">{sop.totalSessions}</td>
-                                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">
-                                        <span className="flex items-center justify-center gap-1">
-                                          <CheckCircleOutlined className="text-green-500 text-xs" />
-                                          {sop.completedSessions}
-                                        </span>
-                                      </td>
-                                      <td className="py-2 px-3 text-xs text-center">
-                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                          sop.avgCompletionPercentage >= 80
-                                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                                            : sop.avgCompletionPercentage >= 50
-                                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                                        }`}>
-                                          {Math.round(sop.avgCompletionPercentage)}%
-                                        </span>
-                                      </td>
-                                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">
-                                        <span className="flex items-center justify-center gap-1">
-                                          <ClockCircleOutlined className="text-blue-500 text-xs" />
-                                          {formatDuration(sop.totalDuration)}
-                                        </span>
-                                      </td>
-                                      <td className="py-2 px-3 text-xs text-gray-700 dark:text-gray-300 text-center">
-                                        <span className="flex items-center justify-center gap-1">
-                                          <ClockCircleOutlined className="text-purple-500 text-xs" />
-                                          {formatDuration(sop.playbackDuration)}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                      </td>
+                      <td onClick={() => toggleEmployee(employee.emp_code)} className="py-4 px-4 text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">
+                            {formatDuration(employee.totalDuration)}
+                          </span>
+                        </div>
+                      </td>
+                      <td onClick={() => toggleEmployee(employee.emp_code)} className="py-4 px-4 text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                            {formatDuration(employee.avgSessionDuration || employee.avgDuration)}
+                          </span>
+                        </div>
+                      </td>
+                      <td onClick={() => toggleEmployee(employee.emp_code)} className="py-4 px-4 text-center">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                          expandedEmployees.has(employee.emp_code) 
+                            ? "bg-blue-600 text-white rotate-180" 
+                            : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+                        }`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedEmployees.has(employee.emp_code) && (
+                      <tr>
+                        <td colSpan={7} className="p-0">
+                          <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-700/30 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700">
+                            <div className="p-5 space-y-3">
+                              {employee.dates.map((dateItem, dateIndex) => (
+                                <div key={dateIndex} className="border border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm">
+                                  <div
+                                    onClick={() => toggleDate(employee.emp_code, dateItem.date)}
+                                    className="bg-white dark:bg-slate-800 px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-200"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-500/30">
+                                        <ClockCircleOutlined className="text-lg" />
+                                      </div>
+                                      <div>
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">{dateItem.date}</span>
+                                        {employee.mostPlayedSOP && dateIndex === 0 && (
+                                          <div className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1 mt-1">
+                                            <FileTextOutlined className="text-[10px]" /> Top SOP: {employee.mostPlayedSOP}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                      <div className="text-center px-3">
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Machines</div>
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{dateItem.machines.length}</div>
+                                      </div>
+                                      <div className="text-center px-3">
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Sessions</div>
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{dateItem.totalSessions}</div>
+                                      </div>
+                                      <div className="text-center px-3">
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Duration</div>
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{formatDuration(dateItem.totalDuration)}</div>
+                                      </div>
+                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                                        expandedDates.has(`${employee.emp_code}-${dateItem.date}`) 
+                                          ? "bg-purple-600 text-white rotate-180" 
+                                          : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+                                      }`}>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {expandedDates.has(`${employee.emp_code}-${dateItem.date}`) && (
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-700 bg-slate-50/50 dark:bg-slate-700/20">
+                                      {dateItem.machines.map((machine, machineIndex) => (
+                                        <div key={machineIndex} className="p-5">
+                                          <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-2">
+                                              <DesktopOutlined className="text-purple-600 dark:text-purple-400" />
+                                              <span className="font-bold text-slate-900 dark:text-white text-sm">
+                                                {machine.machine_number || "No Machine"}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs">
+                                              <span className="text-slate-600 dark:text-slate-400 font-medium">
+                                                {machine.totalSessions} sessions
+                                              </span>
+                                              <span className="text-slate-600 dark:text-slate-400 font-medium">
+                                                {formatDuration(machine.totalDuration)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-600">
+                                            <table className="w-full">
+                                              <thead>
+                                                <tr className="bg-slate-100 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-600">
+                                                  <th className="text-left py-3 px-4 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">SOP</th>
+                                                  <th className="text-center py-3 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Cycle</th>
+                                                  <th className="text-center py-3 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Sessions</th>
+                                                  <th className="text-center py-3 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Completed</th>
+                                                  <th className="text-center py-3 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Completion</th>
+                                                  <th className="text-center py-3 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Total Duration</th>
+                                                  <th className="text-center py-3 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Playback Duration</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {machine.sops.map((sop, sopIndex) => (
+                                                  <tr key={sopIndex} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                                                    <td className="py-3 px-4 text-xs font-semibold text-slate-900 dark:text-white">{sop.sop_title || "Unknown SOP"}</td>
+                                                    <td className="py-3 px-3 text-xs text-slate-600 dark:text-slate-400 text-center">{sop.cycle_number || 1}</td>
+                                                    <td className="py-3 px-3 text-xs text-slate-600 dark:text-slate-400 text-center">{sop.totalSessions}</td>
+                                                    <td className="py-3 px-3 text-xs text-slate-600 dark:text-slate-400 text-center">{sop.completedSessions}</td>
+                                                    <td className="py-3 px-3 text-xs text-center">
+                                                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold ${
+                                                        sop.avgCompletionPercentage >= 80
+                                                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                                          : sop.avgCompletionPercentage >= 50
+                                                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                                          : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                                                      }`}>
+                                                        {Math.round(sop.avgCompletionPercentage)}%
+                                                      </span>
+                                                    </td>
+                                                    <td className="py-3 px-3 text-xs text-slate-600 dark:text-slate-400 text-center font-semibold">{formatDuration(sop.totalDuration)}</td>
+                                                    <td className="py-3 px-3 text-xs text-slate-600 dark:text-slate-400 text-center font-semibold">{formatDuration(sop.playbackDuration)}</td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
       ) : (
@@ -461,7 +606,7 @@ const EmployeeAnalysis: React.FC = () => {
           <NoData
             title="No Analysis Data"
             message="No tracking data found for the selected filters."
-            className="py-12"
+            className="py-16"
           />
         )
       )}

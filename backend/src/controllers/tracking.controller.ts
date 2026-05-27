@@ -610,8 +610,10 @@ export const getEmployeeDateWiseAnalysis = async (req: Request, res: Response) =
           playbackDuration: { $sum: { $ifNull: ['$sessions.audio_playbacks.audio_duration', 0] } }, // Sum of individual play times
           avgDuration: { $avg: { $ifNull: ['$sessions.audio_playbacks.audio_duration', 0] } },
           avgCompletionPercentage: { $avg: '$sessions.audio_playbacks.completion_percentage' },
-          firstAudioStart: { $min: '$sessions.audio_playbacks.audio_start_time' }, // First audio start time
-          lastAudioEnd: { $max: { $ifNull: ['$sessions.audio_playbacks.audio_end_time', new Date()] } }, // Last audio end time (or current time if playing)
+          firstAudioStart: { $min: '$sessions.audio_playbacks.audio_start_time' }, // First audio start time for SOP cycle
+          lastAudioEnd: { $max: { $ifNull: ['$sessions.audio_playbacks.audio_end_time', new Date()] } }, // Last audio end time for SOP cycle
+          dayFirstAudioStart: { $min: '$sessions.audio_playbacks.audio_start_time' }, // First audio start time for entire day
+          dayLastAudioEnd: { $max: { $ifNull: ['$sessions.audio_playbacks.audio_end_time', new Date()] } }, // Last audio end time for entire day
           loginTimes: { $push: '$sessions.login_time' },
           logoutTimes: { $push: '$sessions.logout_time' },
         },
@@ -622,6 +624,13 @@ export const getEmployeeDateWiseAnalysis = async (req: Request, res: Response) =
           totalDuration: {
             $divide: [
               { $subtract: ['$lastAudioEnd', '$firstAudioStart'] },
+              1000
+            ]
+          },
+          // Calculate day total duration: last audio end - first audio start for entire day (in seconds)
+          dayTotalDuration: {
+            $divide: [
+              { $subtract: ['$dayLastAudioEnd', '$dayFirstAudioStart'] },
               1000
             ]
           }
@@ -650,7 +659,8 @@ export const getEmployeeDateWiseAnalysis = async (req: Request, res: Response) =
           sop_title: { $ifNull: ['$sop.sopName', 'Unknown SOP'] },
           totalSessions: 1,
           completedSessions: 1,
-          totalDuration: { $round: ['$totalDuration', 2] }, // Time from first audio start to last audio end
+          totalDuration: { $round: ['$totalDuration', 2] }, // Time from first audio start to last audio end for SOP cycle
+          dayTotalDuration: { $round: ['$dayTotalDuration', 2] }, // Time from first to last audio for entire day
           playbackDuration: { $round: ['$playbackDuration', 2] }, // Sum of individual play times
           avgDuration: { $round: ['$avgDuration', 2] },
           avgCompletionPercentage: { $round: ['$avgCompletionPercentage', 2] },
@@ -682,9 +692,22 @@ export const getEmployeeDateWiseAnalysis = async (req: Request, res: Response) =
               $cond: [{ $eq: ['$sessions.audio_playbacks.playback_status', 'completed'] }, 1, 0],
             },
           },
-          totalDuration: { $sum: { $ifNull: ['$sessions.audio_playbacks.audio_duration', 0] } },
+          playbackDuration: { $sum: { $ifNull: ['$sessions.audio_playbacks.audio_duration', 0] } }, // Sum of individual play times
           avgDuration: { $avg: { $ifNull: ['$sessions.audio_playbacks.audio_duration', 0] } },
+          firstAudioStart: { $min: '$sessions.audio_playbacks.audio_start_time' }, // First audio start across all sessions
+          lastAudioEnd: { $max: { $ifNull: ['$sessions.audio_playbacks.audio_end_time', new Date()] } }, // Last audio end across all sessions
         },
+      },
+      {
+        $addFields: {
+          // Calculate total duration: last audio end - first audio start (in seconds)
+          totalDuration: {
+            $divide: [
+              { $subtract: ['$lastAudioEnd', '$firstAudioStart'] },
+              1000
+            ]
+          }
+        }
       },
       {
         $project: {
@@ -693,17 +716,60 @@ export const getEmployeeDateWiseAnalysis = async (req: Request, res: Response) =
           user_name: '$_id.user_name',
           totalSessions: 1,
           completedSessions: 1,
-          totalDuration: { $round: ['$totalDuration', 2] },
+          totalDuration: { $round: ['$totalDuration', 2] }, // Time from first to last audio
           avgDuration: { $round: ['$avgDuration', 2] },
         },
       },
       { $sort: { emp_code: 1 } },
     ]);
 
+    // Calculate overall totals for the summary cards
+    const overallTotals = await Tracking.aggregate([
+      { $match: matchQuery },
+      {
+        $unwind: '$sessions',
+      },
+      {
+        $unwind: '$sessions.audio_playbacks',
+      },
+      {
+        $group: {
+          _id: null,
+          totalSessions: { $sum: 1 },
+          completedSessions: {
+            $sum: {
+              $cond: [{ $eq: ['$sessions.audio_playbacks.playback_status', 'completed'] }, 1, 0],
+            },
+          },
+          firstAudioStart: { $min: '$sessions.audio_playbacks.audio_start_time' },
+          lastAudioEnd: { $max: { $ifNull: ['$sessions.audio_playbacks.audio_end_time', new Date()] } },
+        },
+      },
+      {
+        $addFields: {
+          totalDuration: {
+            $divide: [
+              { $subtract: ['$lastAudioEnd', '$firstAudioStart'] },
+              1000
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalSessions: 1,
+          completedSessions: 1,
+          totalDuration: { $round: ['$totalDuration', 2] },
+        },
+      },
+    ]);
+
     res.status(200).json({
       data: {
         dateWise: analysis,
         summary,
+        overallTotals: overallTotals[0] || { totalSessions: 0, completedSessions: 0, totalDuration: 0 },
       },
     });
   } catch (error) {

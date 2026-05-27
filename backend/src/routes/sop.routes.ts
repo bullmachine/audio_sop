@@ -9,6 +9,7 @@ router.use(authenticate);
 
 // SOP routes
 router.get('/', SOPController.getAll);                    // GET /api/sop - Get all SOPs
+router.get('/active', SOPController.getActive);           // GET /api/sop/active - Get active SOPs
 router.get('/:id', SOPController.getById);                // GET /api/sop/:id - Get SOP by ID
 router.post('/', SOPController.create);                   // POST /api/sop - Create new SOP
 router.put('/:id', SOPController.update);                 // PUT /api/sop/:id - Update SOP

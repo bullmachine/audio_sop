@@ -80,6 +80,29 @@ export class SOPController {
         }
     };
 
+    // Get active SOPs (for dropdown)
+    static getActive = async (req: Request, res: Response) => {
+        try {
+            const sops = await SOP.find({
+                isDeleted: false,
+                isActive: true
+            })
+            .sort({ sop_name: 1 });
+
+            res.status(200).json({
+                success: true,
+                message: 'Active SOPs retrieved successfully',
+                data: sops
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve active SOPs',
+                error: error.message
+            });
+        }
+    };
+
     // Get SOP by ID
     static getById = async (req: Request, res: Response) => {
         try {

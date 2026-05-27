@@ -31,9 +31,9 @@ type FileEntry = {
   existing?: AudioFileItem;
 };
 
-const getRefName = (ref: string | { _id: string; name?: string; stage?: string; language?: string }) => {
+const getRefName = (ref: string | { _id: string; name?: string; stage?: string; language?: string; sop_name?: string }) => {
   if (typeof ref === "string") return ref;
-  return ref.name || ref.stage || ref.language || ref._id;
+  return ref.name || ref.stage || ref.language || ref.sop_name || ref._id;
 };
 
 const AudioFile: React.FC = () => {
@@ -59,7 +59,7 @@ const AudioFile: React.FC = () => {
     product: "",
     stage: "",
     language: "",
-    sopName: "",
+    sop: "",
     operators: [] as string[],
   });
   const [fileEntries, setFileEntries] = useState<FileEntry[]>([]);
@@ -110,7 +110,7 @@ const AudioFile: React.FC = () => {
   );
 
   const resetForm = () => {
-    setForm({ product: "", stage: "", language: "", sopName: "", operators: [] });
+    setForm({ product: "", stage: "", language: "", sop: "", operators: [] });
     setFileEntries([]);
     setEditing(null);
   };
@@ -126,7 +126,7 @@ const AudioFile: React.FC = () => {
       product: typeof item.product === "string" ? item.product : item.product._id,
       stage: typeof item.stage === "string" ? item.stage : item.stage._id,
       language: typeof item.language === "string" ? item.language : item.language._id,
-      sopName: item.sopName,
+      sop: typeof item.sop === "string" ? item.sop : item.sop._id,
       operators: item.operators.map((o) => o._id),
     });
     setFileEntries(
@@ -169,7 +169,7 @@ const AudioFile: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!form.product || !form.stage || !form.language || !form.sopName.trim()) {
+    if (!form.product || !form.stage || !form.language || !form.sop.trim()) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -292,9 +292,9 @@ const AudioFile: React.FC = () => {
               columns={[
                 {
                   label: "SOP Name",
-                  key: "sopName",
+                  key: "sop",
                   render: (item: AudioSop) => (
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{item.sopName}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{typeof item.sop === "string" ? item.sop : (item.sop.sop_name || item.sop._id)}</span>
                   ),
                 },
                 {
@@ -395,8 +395,8 @@ const AudioFile: React.FC = () => {
           <Select
             label="SOP Name"
             options={[{ label: "Select SOP", value: "" }, ...sops]}
-            value={form.sopName}
-            onChange={(e) => setForm((f) => ({ ...f, sopName: e.target.value }))}
+            value={form.sop}
+            onChange={(e) => setForm((f) => ({ ...f, sop: e.target.value }))}
             searchable
           />
 
@@ -458,7 +458,7 @@ const AudioFile: React.FC = () => {
         onClose={() => setDeleteConfirm({ isOpen: false, item: null })}
         onConfirm={confirmDelete}
         title="Delete Assignment"
-        message={`Delete "${deleteConfirm.item?.sopName}" and all associated files?`}
+        message={`Delete "${typeof deleteConfirm.item?.sop === "string" ? deleteConfirm.item?.sop : deleteConfirm.item?.sop.sop_name}" and all associated files?`}
         confirmText="Delete"
         type="danger"
       />

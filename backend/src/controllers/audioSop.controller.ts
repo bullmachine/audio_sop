@@ -6,8 +6,9 @@ import { UPLOADS_ROOT } from "../config/paths.config";
 import AudioSop, { IAudioFile } from "../models/AudioSop";
 import { AuthRequest } from "../types/express";
 import User from "../models/User";
+import Language from "../models/Language";
 
-const populateFields = ["product", "stage", "language", "operators", "createdBy"];
+const populateFields = ["product", "stage", "language", "sop", "operators", "createdBy"];
 const audioSopController = new GenericCrudController(AudioSop, populateFields);
 
 const sortFilesByOrder = (files: IAudioFile[]) => [...files].sort((a, b) => a.order - b.order);
@@ -75,13 +76,13 @@ export const toggleActiveAudioSop = audioSopController.toggleActive;
 
 export const createAudioSop = async (req: AuthRequest, res: Response) => {
   try {
-    const { product, stage, language, sopName, operators, fileOrder } = req.body;
+    const { product, stage, language, sop, operators, fileOrder } = req.body;
     const uploadedFiles = req.files as Express.Multer.File[];
 
-    if (!product || !stage || !language || !sopName?.trim()) {
+    if (!product || !stage || !language || !sop?.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Product, stage, language, and SOP name are required",
+        message: "Product, stage, language, and SOP are required",
       });
     }
 
@@ -124,17 +125,17 @@ export const createAudioSop = async (req: AuthRequest, res: Response) => {
       order: orderMap[file.originalname] ?? index,
     }));
 
-    const sop: any = await AudioSop.create({
+    const audioSopDoc: any = await AudioSop.create({
       product,
       stage,
       language,
-      sopName: sopName.trim(),
+      sop: sop.trim(),
       operators: operatorIds,
       files: sortFilesByOrder(files),
       createdBy: req.user?.id,
     } as any);
 
-    const result = await AudioSop.findById(sop._id).populate(populateFields);
+    const result = await AudioSop.findById(audioSopDoc._id).populate(populateFields);
     res.status(201).json({
       success: true,
       message: "Record created successfully",
@@ -156,24 +157,24 @@ export const createAudioSop = async (req: AuthRequest, res: Response) => {
 
 export const updateAudioSop = async (req: AuthRequest, res: Response) => {
   try {
-    const sop = await AudioSop.findOne({ _id: req.params.id, isDeleted: false });
-    if (!sop) {
+    const audioSopDoc = await AudioSop.findOne({ _id: req.params.id, isDeleted: false });
+    if (!audioSopDoc) {
       return res.status(404).json({ success: false, message: "Record not found" });
     }
 
-    const { product, stage, language, sopName, operators, fileOrder, removedFileIds } = req.body;
+    const { product, stage, language, sop, operators, fileOrder, removedFileIds } = req.body;
     const uploadedFiles = req.files as Express.Multer.File[];
 
-    if (product) sop.product = product;
-    if (stage) sop.stage = stage;
-    if (language) sop.language = language;
-    if (sopName) sop.sopName = sopName.trim();
+    if (product) audioSopDoc.product = product;
+    if (stage) audioSopDoc.stage = stage;
+    if (language) audioSopDoc.language = language;
+    if (sop) audioSopDoc.sop = sop;
 
     if (operators) {
       try {
         const operatorIds = typeof operators === "string" ? JSON.parse(operators) : operators;
         if (Array.isArray(operatorIds) && operatorIds.length > 0) {
-          sop.operators = operatorIds;
+          audioSopDoc.operators = operatorIds;
         }
       } catch {
         return res.status(400).json({ success: false, message: "Invalid operators" });
@@ -191,18 +192,18 @@ export const updateAudioSop = async (req: AuthRequest, res: Response) => {
     }
 
     if (removedIds.length) {
-      sop.files.forEach((file: any) => {
+      audioSopDoc.files.forEach((file: any) => {
         if (removedIds.includes(file._id.toString())) {
           deleteFileFromDisk(file.filePath);
         }
       });
-      sop.files = sop.files.filter(
+      audioSopDoc.files = audioSopDoc.files.filter(
         (file: any) => !removedIds.includes(file._id.toString())
       ) as IAudioFile[];
     }
 
     if (uploadedFiles?.length) {
-      const startOrder = sop.files.length;
+      const startOrder = audioSopDoc.files.length;
       const newFiles: IAudioFile[] = uploadedFiles.map((file, index) => ({
         fileName: file.filename,
         originalName: file.originalname,
@@ -211,25 +212,25 @@ export const updateAudioSop = async (req: AuthRequest, res: Response) => {
         size: file.size,
         order: startOrder + index,
       }));
-      sop.files = [...sop.files, ...newFiles] as IAudioFile[];
+      audioSopDoc.files = [...audioSopDoc.files, ...newFiles] as IAudioFile[];
     }
 
     if (fileOrder) {
       try {
         const orderMap = typeof fileOrder === "string" ? JSON.parse(fileOrder) : fileOrder;
-        sop.files = sop.files.map((file: any) => {
+        audioSopDoc.files = audioSopDoc.files.map((file: any) => {
           const key = file._id?.toString();
           if (key && orderMap[key] !== undefined) file.order = orderMap[key];
           return file;
         }) as IAudioFile[];
-        sop.files = sortFilesByOrder(sop.files);
+        audioSopDoc.files = sortFilesByOrder(audioSopDoc.files);
       } catch {
         /* keep existing order */
       }
     }
 
-    await sop.save();
-    const result = await AudioSop.findById(sop._id).populate(populateFields);
+    await audioSopDoc.save();
+    const result = await AudioSop.findById(audioSopDoc._id).populate(populateFields);
     res.json({
       success: true,
       message: "Record updated successfully",
@@ -275,6 +276,7 @@ export const getMyAssignments = async (req: AuthRequest, res: Response) => {
     }
 
     const sopFilter = req.query.sop as string;
+    const languageFilter = req.query.language as string;
 
     const query: Record<string, unknown> = {
       isDeleted: false,
@@ -282,8 +284,9 @@ export const getMyAssignments = async (req: AuthRequest, res: Response) => {
       operators: req.user.id,
     };
 
-    if (sopFilter) query._id = sopFilter;
-
+    if (sopFilter) query.sop = sopFilter;
+    if (languageFilter) query.language = languageFilter;
+     
     const assignments = await AudioSop.find(query).populate(populateFields).sort({ createdAt: -1 });
 
     res.json({

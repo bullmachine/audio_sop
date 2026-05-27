@@ -85,7 +85,7 @@ export const createAudioSopSchema = () =>
     product: yup.string().required("Product is required"),
     stage: yup.string().required("Stage is required"),
     language: yup.string().required("Language is required"),
-    sopName: yup.string().required("SOP name is required").trim(),
+    sop: yup.string().required("SOP is required").trim(),
     operators: yup.array().of(yup.string().required()).min(1, "Select at least one operator"),
   });
 

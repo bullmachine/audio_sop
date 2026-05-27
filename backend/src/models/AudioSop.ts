@@ -13,7 +13,7 @@ export interface IAudioSop extends Document {
     product: mongoose.Types.ObjectId;
     stage: mongoose.Types.ObjectId;
     language: mongoose.Types.ObjectId;
-    sopName: string;
+    sop: mongoose.Types.ObjectId;
     operators: mongoose.Types.ObjectId[];
     files: IAudioFile[];
     createdBy?: mongoose.Types.ObjectId;
@@ -56,10 +56,11 @@ const audioSopSchema: Schema<IAudioSop> = new mongoose.Schema(
             required: true,
             index: true,
         },
-        sopName: {
-            type: String,
-            required: [true, "SOP name is required"],
-            trim: true,
+        sop: {
+            type: Schema.Types.ObjectId,
+            ref: "SOP",
+            required: true,
+            index: true,
         },
         operators: [{
             type: Schema.Types.ObjectId,

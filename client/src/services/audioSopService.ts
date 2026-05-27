@@ -17,7 +17,7 @@ export interface AudioSop {
   product: { _id: string; name: string } | string;
   stage: { _id: string; stage: string } | string;
   language: { _id: string; language: string } | string;
-  sopName: string;
+  sop: { _id: string; sop_name: string } | string;
   operators: Array<{ _id: string; name: string; empCode: string }>;
   files: AudioFileItem[];
   isActive: boolean;
@@ -28,7 +28,7 @@ export interface AudioSopFormData {
   product: string;
   stage: string;
   language: string;
-  sopName: string;
+  sop: string;
   operators: string[];
   audioFiles: File[];
   fileOrder?: Record<string, number>;
@@ -73,7 +73,7 @@ class AudioSopService extends GenericCrudService<AudioSop> {
     if (data.product) formData.append("product", data.product);
     if (data.stage) formData.append("stage", data.stage);
     if (data.language) formData.append("language", data.language);
-    if (data.sopName) formData.append("sopName", data.sopName);
+    if (data.sop) formData.append("sop", data.sop);
     if (data.operators) formData.append("operators", JSON.stringify(data.operators));
     if (data.fileOrder) formData.append("fileOrder", JSON.stringify(data.fileOrder));
     if (data.removedFileIds) formData.append("removedFileIds", JSON.stringify(data.removedFileIds));

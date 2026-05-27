@@ -126,7 +126,7 @@ class TrackingService {
     end_date?: string;
     emp_code?: string;
     machine_number?: string;
-  }): Promise<{ data: { dateWise: any[]; summary: any[] } }> {
+  }): Promise<{ data: { dateWise: any[]; summary: any[]; overallTotals: { totalSessions: number; completedSessions: number; totalDuration: number } } }> {
     return apiRequest.get(`${this.endpoint}/employee-date-wise-analysis`, { params });
   }
 }

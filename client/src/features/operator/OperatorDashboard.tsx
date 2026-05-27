@@ -17,9 +17,14 @@ import { useLoader } from "../../shared/hooks/useLoader";
 import { getAudioUrl } from "../../utils/audioUrl";
 import { toast } from "react-toastify";
 
-const getLabel = (ref: string | { _id: string; name?: string; stage?: string; language?: string }) => {
+const getLabel = (ref: string | { _id: string; name?: string; stage?: string; language?: string; sop_name?: string }) => {
   if (typeof ref === "string") return ref;
-  return ref.name || ref.stage || ref.language || "";
+  return ref.name || ref.stage || ref.language || ref.sop_name || "";
+};
+
+const getSopName = (sop: { _id: string; sop_name: string } | string): string => {
+  if (typeof sop === "string") return sop;
+  return sop.sop_name || "";
 };
 
 type PlaylistTrack = {
@@ -41,7 +46,7 @@ const buildPlaylist = (assignments: AudioSop[]): PlaylistTrack[] => {
         id: file._id || `${assignment._id}-${index}`,
         src: getAudioUrl(file.filePath),
         originalName: file.originalName,
-        sopName: assignment.sopName,
+        sopName: getSopName(assignment.sop),
         assignmentId: assignment._id,
         order: file.order ?? index,
       });
@@ -56,7 +61,9 @@ const OperatorDashboard: React.FC = () => {
   const [assignments, setAssignments] = useState<AudioSop[]>([]);
   const [loading, setLoading] = useState(true);
   const [sopFilter, setSopFilter] = useState<string | null>(null);
+  const [languageFilter, setLanguageFilter] = useState<string | null>(null);
   const [availableSops, setAvailableSops] = useState<{ label: string; value: string }[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<{ label: string; value: string }[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -71,12 +78,10 @@ const OperatorDashboard: React.FC = () => {
   useEffect(() => {
   if (!("mediaSession" in navigator)) return;
 
-    // ▶ PLAY BUTTON (HEADSET)
     navigator.mediaSession.setActionHandler("play", async () => {
       const audio = audioRef.current;
       if (!audio) return;
 
-      // 👉 IF SONG ENDED → PLAY NEXT
       if (audio.ended || audio.currentTime === audio.duration) {
         const next = currentTrackIndexRef.current + 1;
 
@@ -93,7 +98,6 @@ const OperatorDashboard: React.FC = () => {
       }
     });
 
-    // ⏸ PAUSE BUTTON
     navigator.mediaSession.setActionHandler("pause", () => {
       const audio = audioRef.current;
       if (!audio) return;
@@ -105,7 +109,6 @@ const OperatorDashboard: React.FC = () => {
       }
     });
 
-    // ⏭ NEXT BUTTON
     navigator.mediaSession.setActionHandler("nexttrack", async () => {
       const next = currentTrackIndexRef.current + 1;
 
@@ -114,7 +117,6 @@ const OperatorDashboard: React.FC = () => {
       }
     });
 
-    // ⏮ PREVIOUS BUTTON
     navigator.mediaSession.setActionHandler("previoustrack", async () => {
       const prev = currentTrackIndexRef.current - 1;
 
@@ -141,11 +143,11 @@ const OperatorDashboard: React.FC = () => {
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
   const fetchAssignments = async () => {
-    if (!sopFilter) {
+    if (!sopFilter || !languageFilter) {
       setAssignments([]);
       return;
     }
-    const params: Record<string, string> = { sop: sopFilter };
+    const params: Record<string, string> = { sop: sopFilter, language: languageFilter };
     const response = await ServiceFactory.audioSopService.getMyAssignments(params);
     setAssignments(response.data || []);
   };
@@ -159,6 +161,10 @@ const OperatorDashboard: React.FC = () => {
   const sopOptions = useMemo(() => {
     return [{ label: "Select SOP", value: "" }, ...availableSops];
   }, [availableSops]);
+
+  const languageOptions = useMemo(() => {
+    return [{ label: "Select Language", value: "" }, ...availableLanguages];
+  }, [availableLanguages]);
 
   const stopPlayback = useCallback(() => {
     const audio = audioRef.current;
@@ -190,11 +196,9 @@ const OperatorDashboard: React.FC = () => {
         setIsPlaying(true);
         trackingStartTimeRef.current = new Date();
 
-        // Create tracking record
         try {
           const userStr = localStorage.getItem('user');
           const user = userStr ? JSON.parse(userStr) : null;
-          console.log('User data from localStorage:', user);
 
           const trackData: any = {
             tracking_type: 'audio_playback',
@@ -209,7 +213,6 @@ const OperatorDashboard: React.FC = () => {
           console.error('Error creating tracking:', trackingError);
         }
 
-        // ✅ HEADSET FIX START
         if ("mediaSession" in navigator) {
           navigator.mediaSession.metadata = new MediaMetadata({
             title: track.originalName,
@@ -226,7 +229,6 @@ const OperatorDashboard: React.FC = () => {
             position: audio.currentTime,
           });
         }
-        // ✅ HEADSET FIX END
       } catch {
         toast.error(`Unable to play "${track.originalName}". Check that the file exists on the server.`);
         stopPlayback();
@@ -303,9 +305,9 @@ const OperatorDashboard: React.FC = () => {
   useEffect(() => {
     const fetchAvailableSops = async () => {
       try {
-        const response = await ServiceFactory.audioSopService.getActive();
+        const response: any = await ServiceFactory.sopService.getAll();
         const sops = response.data.map((s: any) => ({
-          label: s.sopName,
+          label: s.sop_name,
           value: s._id,
         }));
         setAvailableSops(sops);
@@ -317,17 +319,36 @@ const OperatorDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (sopFilter !== null) {
+    const fetchAvailableLanguages = async () => {
+      try {
+        const response: any = await ServiceFactory.languageService.getAll();
+        const languages = response.data.map((lang: any) => ({
+          label: lang.language,
+          value: lang._id,
+        }));
+        setAvailableLanguages(languages);
+      } catch (error) {
+        console.error("Error fetching available languages:", error);
+      }
+    };
+    fetchAvailableLanguages();
+  }, []);
+
+  useEffect(() => {
+    setLanguageFilter(null);
+  }, [sopFilter]);
+
+  useEffect(() => {
+    if (sopFilter && languageFilter) {
       fetchWithLoader();
     } else {
       setAssignments([]);
       setLoading(false);
     }
-  }, [sopFilter]);
+  }, [sopFilter, languageFilter]);
 
     useEffect(() => {
     const audio = new Audio(); 
-    // ✅ ADD THIS
 audio.addEventListener("timeupdate", () => {
     if ("mediaSession" in navigator) {
       navigator.mediaSession.setPositionState({
@@ -348,7 +369,6 @@ audio.addEventListener("timeupdate", () => {
         navigator.mediaSession.playbackState = "paused";
       }
 
-      // Complete tracking record
       if (currentTrackingIdRef.current && trackingStartTimeRef.current) {
         const audioDuration = audio.duration || 0;
         trackingService.updateTracking(currentTrackingIdRef.current, {
@@ -395,14 +415,23 @@ audio.addEventListener("timeupdate", () => {
       <div className="mb-6 p-5 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Assigned Audio SOPs</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Tracks play in admin order. Use earphone controls to navigate between tracks.
+          Select both SOP and Language to view audio files. Tracks play in admin order.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Select
-            label=""
+            label="SOP"
             options={sopOptions}
             value={sopFilter}
-            onChange={(e) => setSopFilter(e.target.value)}
+            onChange={(e) => {
+              setSopFilter(e.target.value);
+            }}
+            searchable
+          />
+          <Select
+            label="Language"
+            options={languageOptions}
+            value={languageFilter}
+            onChange={(e) => setLanguageFilter(e.target.value)}
             searchable
           />
         </div>
@@ -411,7 +440,7 @@ audio.addEventListener("timeupdate", () => {
       {!loading && assignments.length === 0 ? (
         <NoData
           title="No Audio Files Assigned"
-          message="Your administrator has not assigned any audio SOPs yet."
+          message={(!sopFilter || !languageFilter) ? "Please select both SOP and Language to view audio files." : "Your administrator has not assigned any audio SOPs yet."}
           className="py-12"
         />
       ) : (
@@ -427,7 +456,7 @@ audio.addEventListener("timeupdate", () => {
                 <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                   <div className="flex flex-wrap items-center gap-2">
                     <SoundOutlined className="text-blue-500" />
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{assignment.sopName}</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{getSopName(assignment.sop)}</h3>
                   </div>
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
                     <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
