@@ -25,8 +25,7 @@ class NotificationService {
     if (this.socket) {
       this.socket.disconnect();
     }
-
-    console.log('Initializing Socket.IO connection for user:', userId);
+ 
 
     // Connect to Socket.IO server with timeout handling
     const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:8000';
@@ -42,16 +41,11 @@ class NotificationService {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket.IO connected for notifications:', userId);
-      console.log('Socket ID:', this.socket?.id);
-      
       // Join user-specific room
-      this.socket?.emit('join_user_room', { userId });
-      console.log('📡 Joined user room for:', userId);
+      this.socket?.emit('join_user_room', { userId }); 
     });
 
-    this.socket.on('connect_error', (error) => {
-      console.error('❌ Socket.IO connection error:', error);
+    this.socket.on('connect_error', (error) => { 
       
       // Handle different types of connection errors
       if (error.message?.includes('timeout')) {

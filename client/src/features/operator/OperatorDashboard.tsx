@@ -75,63 +75,97 @@ const OperatorDashboard: React.FC = () => {
   const currentTrackingIdRef = useRef<string | null>(null);
 
   const playlist = useMemo(() => buildPlaylist(assignments), [assignments]);
+  // Audio unlock mechanism: enables audio playback on initial load
   useEffect(() => {
-  if (!("mediaSession" in navigator)) return;
+    const handleInteraction = () => {
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        audioCtx.close();
+      } catch {
+        // Ignore errors - audio context might not be supported
+      }
+    };
 
-    navigator.mediaSession.setActionHandler("play", async () => {
+    document.addEventListener('click', handleInteraction, { once: true });
+    document.addEventListener('touchstart', handleInteraction, { once: true });
+    document.addEventListener('keydown', handleInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+    };
+  }, []);
+
+  // Window event listeners for headset controls (wired and Bluetooth)
+  useEffect(() => {
+    
+    const handleKeyDown = async (event: KeyboardEvent) => { 
       const audio = audioRef.current;
       if (!audio) return;
 
-      if (audio.ended || audio.currentTime === audio.duration) {
+      // Media keys for headsets
+      if (event.key === 'MediaPlayPause' || event.key === 'MediaPlayPause') {
+        event.preventDefault();
+        if (isPlaying) {
+          audio.pause();
+          setIsPlaying(false);
+        } else {
+          if (audio.ended || audio.currentTime === audio.duration) {
+            const currentIdx = currentTrackIndexRef.current;
+            if (currentIdx >= 0) {
+              await playTrackAtRef.current(currentIdx);
+            }
+          } else {
+            await audio.play();
+            setIsPlaying(true);
+          }
+        }
+      } else if (event.key === 'MediaTrackNext') {
+        event.preventDefault();
         const next = currentTrackIndexRef.current + 1;
-
         if (next < playlistRef.current.length) {
           await playTrackAtRef.current(next);
         }
-        return;
+      } else if (event.key === 'MediaTrackPrev') {
+        event.preventDefault();
+        const prev = currentTrackIndexRef.current - 1;
+        if (prev >= 0) {
+          await playTrackAtRef.current(prev);
+        }
+      } else if (event.key === 'Space') {
+        // Space bar for play/pause (only if not focused on an input)
+        const target = event.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          event.preventDefault();
+          if (isPlaying) {
+            audio.pause();
+            setIsPlaying(false);
+          } else {
+            if (audio.ended || audio.currentTime === audio.duration) {
+              const currentIdx = currentTrackIndexRef.current;
+              if (currentIdx >= 0) {
+                await playTrackAtRef.current(currentIdx);
+              }
+            } else {
+              await audio.play();
+              setIsPlaying(true);
+            }
+          }
+        }
       }
+    };
 
-      await audio.play();
-      setIsPlaying(true);
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "playing";
-      }
-    });
+    window.addEventListener('keydown', handleKeyDown);
 
-    navigator.mediaSession.setActionHandler("pause", () => {
-      const audio = audioRef.current;
-      if (!audio) return;
-
-      audio.pause();
-      setIsPlaying(false);
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "paused";
-      }
-    });
-
-    navigator.mediaSession.setActionHandler("nexttrack", async () => {
-      const next = currentTrackIndexRef.current + 1;
-
-      if (next < playlistRef.current.length) {
-        await playTrackAtRef.current(next);
-      }
-    });
-
-    navigator.mediaSession.setActionHandler("previoustrack", async () => {
-      const prev = currentTrackIndexRef.current - 1;
-
-      if (prev >= 0) {
-        await playTrackAtRef.current(prev);
-      }
-    });
-
-  return () => {
-    navigator.mediaSession.setActionHandler("play", null);
-    navigator.mediaSession.setActionHandler("pause", null);
-    navigator.mediaSession.setActionHandler("nexttrack", null);
-    navigator.mediaSession.setActionHandler("previoustrack", null);
-  };
-}, []);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isPlaying]); 
+  
     useEffect(() => {
     playlistRef.current = playlist;
   }, [playlist]);
@@ -213,22 +247,8 @@ const OperatorDashboard: React.FC = () => {
           console.error('Error creating tracking:', trackingError);
         }
 
-        if ("mediaSession" in navigator) {
-          navigator.mediaSession.metadata = new MediaMetadata({
-            title: track.originalName,
-            artist: track.sopName,
-            album: "Audio SOP",
-          });
-
-          navigator.mediaSession.playbackState = "playing";
-        }
-        if ("mediaSession" in navigator) {
-          navigator.mediaSession.setPositionState({
-            duration: audio.duration || 0,
-            playbackRate: audio.playbackRate,
-            position: audio.currentTime,
-          });
-        }
+        
+        
       } catch {
         toast.error(`Unable to play "${track.originalName}". Check that the file exists on the server.`);
         stopPlayback();
@@ -350,13 +370,7 @@ const OperatorDashboard: React.FC = () => {
     useEffect(() => {
     const audio = new Audio(); 
 audio.addEventListener("timeupdate", () => {
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.setPositionState({
-        duration: audio.duration || 0,
-        playbackRate: audio.playbackRate,
-        position: audio.currentTime,
-      });
-    }
+    // Time update handler - can be used for progress tracking
   }); 
     audio.preload = "metadata";
     audioRef.current = audio;
@@ -365,9 +379,7 @@ audio.addEventListener("timeupdate", () => {
       audio.pause();
       audio.currentTime = 0;
       setIsPlaying(false);
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.playbackState = "paused";
-      }
+      
 
       if (currentTrackingIdRef.current && trackingStartTimeRef.current) {
         const audioDuration = audio.duration || 0;

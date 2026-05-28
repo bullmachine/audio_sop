@@ -41,29 +41,22 @@ export const useNotifications = () => {
   useEffect(() => {
     // Get user from localStorage using correct storage key
     const userStr = localStorage.getItem(STORAGE_KEYS.USER);
-    console.log('🔍 Checking localStorage contents:');
-    console.log('All localStorage keys:', Object.keys(localStorage));
-    console.log('📋 User string from localStorage:', userStr);
     
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        console.log('👤 Parsed user object:', user);
-        console.log('🆔 User ID:', user._id || user.id);
-        console.log('👑 User name:', user.name);
+       
         
         // Handle both 'id' and '_id' fields
         const userId = user._id || user.id;
         
-        if (userId) {
-          console.log('🚀 Initializing notifications for user:', userId);
+        if (userId) { 
           // Use Socket.IO instead of WebSocket
           notificationService.initializeSocketIO(userId);
           
           // Log connection status after 2 seconds
           setTimeout(() => {
-            const status = notificationService.getConnectionStatus();
-            console.log('📊 Socket.IO connection status:', status);
+            const status = notificationService.getConnectionStatus(); 
           }, 2000);
         } else {
           console.warn('⚠️ No user ID found in user data');
